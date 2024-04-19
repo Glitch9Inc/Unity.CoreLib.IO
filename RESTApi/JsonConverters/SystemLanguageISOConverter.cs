@@ -1,0 +1,26 @@
+using System;
+using Newtonsoft.Json;
+using UnityEngine;
+
+namespace Glitch9.IO.RESTApi
+{
+    public class SystemLanguageISOConverter : JsonConverter<SystemLanguage>
+    {
+        public override void WriteJson(JsonWriter writer, SystemLanguage value, JsonSerializer serializer)
+        {
+            string isoCode = value.ToISOCode();
+            writer.WriteValue(isoCode);
+        }
+
+        public override SystemLanguage ReadJson(JsonReader reader, Type objectType, SystemLanguage existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            if (reader.TokenType != JsonToken.String)
+            {
+                throw new JsonSerializationException("Expected string value for language code");
+            }
+
+            string isoCode = (string)reader.Value;
+            return LocaleUtils.ParseISOCode(isoCode);
+        }
+    }
+}
