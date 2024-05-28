@@ -2,9 +2,9 @@ using Cysharp.Threading.Tasks;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using System;
-using System.Net.Http;
 using UnityEngine;
 using UnityEngine.Networking;
+
 
 namespace Glitch9.IO.RESTApi
 {
@@ -29,11 +29,10 @@ namespace Glitch9.IO.RESTApi
         private const int NETWORK_CHECK_INTERVAL_IN_MILLIS = 500;
         private static Version _version;
 
-
         /// <summary>
         /// Gets the version of the RESTApi library.
         /// </summary>
-        public static Version Version => _version ??= new Version("3.3.2");
+        public static Version Version => _version ??= new Version("3.3.6");
 
         public static async UniTask CheckNetworkAsync()
         {
@@ -49,11 +48,11 @@ namespace Glitch9.IO.RESTApi
                     }
                 });
 
-                GNLog.Log("Network connection re-established.");
+                GNLog.Info("Network connection re-established.");
             }
         }
 
-        public static async UniTask<TaskResult> SendAndProcessRequest(UnityWebRequest request, float delayInSec, int retryCount)
+        public static async UniTask<Result> SendAndProcessRequest<TErr>(UnityWebRequest request, float delayInSec, int retryCount)
         {
             try
             {
@@ -62,88 +61,77 @@ namespace Glitch9.IO.RESTApi
             }
             catch (Exception ex) // Catching more general exception for broader coverage
             {
+                string msg = ex.Message;
+                if (!string.IsNullOrEmpty(msg))
+                {
+                    TErr errorObject = JsonConvert.DeserializeObject<TErr>(msg);
+                    if (errorObject != null)
+                    {
+                        //TODO: Do something with the error object
+                    }
+                }
+                
                 GNLog.Error($"An error occurred during request: {ex.Message}");
-                return TaskResult.Error(ex); // Assuming TaskResult.Error can handle general exceptions
+                return new Error(ex); // Assuming TaskResult.CreateError can handle general exceptions
             }
         }
 
-        public static async UniTask<TaskResult> HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int retryCount)
+        public static async UniTask<Result> HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries)
         {
-            TaskResult result = TaskResult.Success; // Assuming a default successful state
-            if (baseDelayInSec < 2) baseDelayInSec = 2; // Minimum delay of 2 seconds
+            if (request == null) return new Error("UnityWebRequest is null");
 
-            for (int attempt = 0; attempt < retryCount; ++attempt)
+            float currentDelay = baseDelayInSec;
+            if (baseDelayInSec < 2) currentDelay = 2; // Minimum delay of 2 seconds
+
+            for (int attempt = 0; attempt < maxRetries; ++attempt)
             {
+                if (request.isDone) break;
+                
                 try
                 {
                     await request.SendWebRequest().ToUniTask();
 
                     if (request.result == UnityWebRequest.Result.Success)
                     {
-                        return TaskResult.Success;
+                        return Result.Success();
                     }
-
-                    if (HasErrorObject(request.downloadHandler.text, out result))
-                    {
-                        return result;
-                    }
-                    else if (request.result == UnityWebRequest.Result.ProtocolError && request.responseCode == 429)
-                    {
-                        Debug.LogWarning("Too many requests. Retrying after delay.");
-                    }
-                    else if (request.result == UnityWebRequest.Result.ConnectionError)
-                    {
-                        Debug.LogWarning("Connection error detected. Retrying after delay.");
-                    }
-                    else if (request.result == UnityWebRequest.Result.DataProcessingError)
-                    {
-                        Debug.LogWarning("Data processing error detected. Retrying after delay.");
-                    }
-                    else
-                    {
-                        // Not retrying here.
-                        Debug.LogError($"Request failed: {request.error}");
-                        return TaskResult.Error(new HttpRequestException(request.error));
-                    }
+   
+                    LogRequestError(request);
                 }
                 catch (Exception ex)
                 {
-                    if (HasErrorObject(request.downloadHandler.text, out result))
-                    {
-                        return result;
-                    }
-
-                    if (attempt == retryCount - 1)
-                    {
-                        return TaskResult.Error(ex);
-                    }
+                    Debug.LogError($"Request failed: {ex.Message}");
+                    if (attempt == maxRetries - 1) throw; // Last attempt, rethrow exception
                 }
 
-                if (attempt < retryCount - 1)
-                {
-                    float delay = baseDelayInSec * (int)Math.Pow(2, attempt); // 지수 백오프 계산
-                    Debug.Log($"Waiting {delay} seconds before retrying...");
-                    await UniTask.Delay(TimeSpan.FromSeconds(delay));
-                }
+                await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));
+                currentDelay *= 2; // Exponential backoff
             }
 
-            return result;
+            return new Error(Issue.RequestFailed);
         }
 
-        private static bool HasErrorObject(string handlerText, out TaskResult taskResult)
+        private static void LogRequestError(UnityWebRequest request)
         {
-            taskResult = null;
-            if (string.IsNullOrWhiteSpace(handlerText) || !handlerText.Contains("error"))
+            switch (request.result)
             {
-                return false;
+                case UnityWebRequest.Result.ConnectionError:
+                    Debug.LogWarning("Connection error detected.");
+                    break;
+                case UnityWebRequest.Result.DataProcessingError:
+                    Debug.LogWarning("Data processing error detected.");
+                    break;
+                case UnityWebRequest.Result.ProtocolError:
+                    Debug.LogWarning("HTTP error detected: " + request.responseCode);
+                    break;
+                default:
+                    Debug.LogWarning("Unknown error occurred.");
+                    break;
             }
-            taskResult = TaskResult.Error(Issue.ErrorObjectReturned, handlerText);
-            Debug.LogError(handlerText);
-            return true;
         }
 
         public static bool TryGetError<TErr>(string resultAsString, JsonSerializerSettings jsonSettings, [CanBeNull] out TErr error)
-            where TErr : RESTError, new()
+            where TErr : Error, new()
         {
             if (!resultAsString.Search("error :"))
             {

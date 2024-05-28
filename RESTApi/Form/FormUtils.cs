@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using Glitch9.IO.Files;
 using UnityEngine.Networking;
 
 namespace Glitch9.IO.RESTApi

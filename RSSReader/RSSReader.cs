@@ -2,7 +2,7 @@ using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Web;
+using System.Net;
 using System.Xml;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -59,10 +59,10 @@ namespace Glitch9.IO.RSSReader
                     {
                         FeedDocument feedDoc = new()
                         {
-                            Title = HttpUtility.HtmlDecode(itemNode.SelectSingleNode("title").InnerText),
+                            Title = WebUtility.HtmlDecode(itemNode.SelectSingleNode("title").InnerText),
                             Url = itemNode.SelectSingleNode("link").InnerText,
                             PublishedDate = DateTime.Parse(itemNode.SelectSingleNode("pubDate").InnerText, CultureInfo.InvariantCulture),
-                            Content = HttpUtility.HtmlDecode(itemNode.SelectSingleNode("description").InnerText)
+                            Content = WebUtility.HtmlDecode(itemNode.SelectSingleNode("description").InnerText)
                         };
 
                         feedDoc.SetCategory(itemNode.SelectSingleNode("category")?.InnerText);
@@ -93,6 +93,7 @@ namespace Glitch9.IO.RSSReader
 
             onResult?.Invoke(_feedDocuments);
         }
+
 
         private async UniTask DownloadImage(FeedDocument feedDoc, string url)
         {

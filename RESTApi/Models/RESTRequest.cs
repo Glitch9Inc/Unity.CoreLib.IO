@@ -2,6 +2,9 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Glitch9.IO.Files;
+using Sirenix.OdinInspector;
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Glitch9.IO.RESTApi
@@ -28,12 +31,12 @@ namespace Glitch9.IO.RESTApi
         /// <summary>
         /// (Optional) The content type of the request. Default is Json
         /// </summary>
-        [JsonIgnore] public ContentType ContentType { get; set; } = ContentType.JSON;
+        [JsonIgnore] public ContentType ContentType { get; set; } = ContentType.Json;
 
         /// <summary>
         /// (Optional) The content type of the request. Default is Json
         /// </summary>
-        [JsonIgnore] public ContentType ResponseContentType { get; set; } = ContentType.JSON;
+        [JsonIgnore] public ContentType ResponseContentType { get; set; } = ContentType.Json;
 
         /// <summary>
         /// (Required) Defines the target URL for the UnityWebRequest to communicate with
@@ -48,7 +51,7 @@ namespace Glitch9.IO.RESTApi
         /// <summary>
         /// The number of retries of the request. Default is 3
         /// </summary>
-        [JsonIgnore] public int RetryCount { get; set; } = DEFAULT_RETRY_COUNT;
+        [JsonIgnore] public int MaxRetry { get; set; } = DEFAULT_RETRY_COUNT;
 
         /// <summary>
         /// Seconds of delay to make a retry. Default is 1
@@ -81,6 +84,11 @@ namespace Glitch9.IO.RESTApi
         [JsonIgnore] public UnityWebRequest WebRequest { get; set; }
 
         /// <summary>
+        /// The form data of the request
+        /// </summary>
+        [JsonIgnore] public WWWForm Form { get; set; }
+
+        /// <summary>
         /// The callback for the Text stream response
         /// </summary>
         [JsonIgnore] public Action<string> OnTextStreamReceived { get; set; }
@@ -91,20 +99,26 @@ namespace Glitch9.IO.RESTApi
         [JsonIgnore] public Action<byte[]> OnBinaryStreamReceived { get; set; }
 
         /// <summary>
-        /// Set to true if you want to log the request
-        /// </summary>
-        [JsonIgnore] public bool IsLogEnabled { get; set; } = false;
-
-        /// <summary>
         /// The directory path where the file will be downloaded.
         /// </summary>
         [JsonIgnore] public string FilePath { get; set; }
+
+        /// <summary>
+        /// This is only used locally.
+        /// </summary>
+        [JsonIgnore] public Guid Guid { get; } = Guid.NewGuid();
+
 
         protected RESTRequest() { }
 
         public void SetSecret(string secret)
         {
             AddHeader(DEFAULT_AUTH_HEADER_FIELD_NAME, $"Bearer {secret}");
+        }
+
+        public void AddAuthHeader(string headerValue, string headerName = DEFAULT_AUTH_HEADER_FIELD_NAME)
+        {
+            Headers.Add(new RESTHeader(headerName, headerValue));
         }
 
         public void AddHeader(string key, string value)
@@ -124,6 +138,44 @@ namespace Glitch9.IO.RESTApi
         }
 
 
+        // equal check using Guid
+        public static bool operator ==(RESTRequest left, RESTRequest right)
+        {
+            if (ReferenceEquals(left, null) && ReferenceEquals(right, null))
+            {
+                return true;
+            }
+            if (ReferenceEquals(left, null) || ReferenceEquals(right, null))
+            {
+                return false;
+            }
+            return left.Guid == right.Guid;
+        }
+
+        public static bool operator !=(RESTRequest left, RESTRequest right)
+        {
+            return !(left == right);
+        }
+
+        protected bool Equals(RESTRequest other)
+        {
+            return Equals(Guid, other.Guid);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((RESTRequest)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Guid);
+        }
+
+        
         public abstract class BaseApiReqBuilder<TBuilder, TReq>
             where TBuilder : BaseApiReqBuilder<TBuilder, TReq>
             where TReq : RESTRequest
@@ -145,11 +197,11 @@ namespace Glitch9.IO.RESTApi
             /// <summary>
             /// Set the number of retries of the request
             /// </summary>
-            /// <param name="retryCount"></param>
+            /// <param name="maxRetry"></param>
             /// <returns></returns>
-            public TBuilder SetRetryCount(int retryCount)
+            public TBuilder SetMaxRetry(int maxRetry)
             {
-                _req.RetryCount = retryCount;
+                _req.MaxRetry = maxRetry;
                 return (TBuilder)this;
             }
 
@@ -175,7 +227,12 @@ namespace Glitch9.IO.RESTApi
                 return (TBuilder)this;
             }
 
-            public TBuilder SetResponseFormat(DownloadMode downloadMode)
+            /// <summary>
+            /// Set <see cref="RESTApi.DownloadMode"/> of the request. Default is <see cref="DownloadMode.Text"/>
+            /// </summary>
+            /// <param name="downloadMode"></param>
+            /// <returns></returns>
+            public TBuilder SetDownloadMode(DownloadMode downloadMode)
             {
                 _req.DownloadMode = downloadMode;
                 return (TBuilder)this;
@@ -264,17 +321,6 @@ namespace Glitch9.IO.RESTApi
                 return (TBuilder)this;
             }
 
-            /// <summary>
-            /// Set it true if you want to log the request and response
-            /// </summary>
-            /// <param name="isEnabled"></param>
-            /// <returns></returns>
-            public TBuilder SetLogEnabled(bool isEnabled)
-            {
-                _req.IsLogEnabled = isEnabled;
-                return (TBuilder)this;
-            }
-
             public TBuilder SetFilePath(string filePath)
             {
                 _req.FilePath = filePath;
@@ -300,18 +346,22 @@ namespace Glitch9.IO.RESTApi
                 }
 
                 if (missingFields.Count <= 0) return true;
-
                 GNLog.Error($"[APIReq] {typeof(TReq).Name}: Missing required properties: {string.Join(", ", missingFields)}");
                 return false;
             }
 
-            public TBuilder SetResponseContentType(ContentType contentType)
+            public TBuilder SetReturnContentType(ContentType contentType)
             {
                 _req.ResponseContentType = contentType;
                 return (TBuilder)this;
             }
 
-            public virtual TReq Build(ContentType contentType = ContentType.JSON)
+            public virtual TReq Build()
+            {
+                return Build(ContentType.Json);
+            }
+
+            public virtual TReq Build(ContentType contentType)
             {
                 if (AllRequiredPropertiesSet())
                 {

@@ -25,11 +25,11 @@ namespace Glitch9.IO
             dlPath = dlPath.Replace("//", "/");
 
             string dir = Path.GetDirectoryName(dlPath);
-            GNLog.Log($"Download Dir: {dir} | Download Path: {dlPath}");
+            GNLog.Info($"Download Dir: {dir} | Download Path: {dlPath}");
             
             if (!Directory.Exists(dir))
             {
-                GNLog.Log($"Creating directory: {dir}");
+                GNLog.Info($"Creating directory: {dir}");
                 Directory.CreateDirectory(dir);
             }
 
@@ -119,7 +119,7 @@ namespace Glitch9.IO
         private static void DisplayEditorDialogue(string v2, bool isError = false)
         {
             if (isError) GNLog.Error(v2);
-            else GNLog.Log(v2);
+            else GNLog.Info(v2);
         }
 
         #region Audio Download

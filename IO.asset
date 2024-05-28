@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc78cb7c25350cb42a581c0b3e46292a, type: 3}
   m_Name: IO
   m_EditorClassIdentifier: 
-  gitUrl: 
+  gitUrl: https://github.com/Glitch9Inc/IO.git
   gitBranch: main
-  localDir: 
+  localDir: Assets\Glitch9\IO
