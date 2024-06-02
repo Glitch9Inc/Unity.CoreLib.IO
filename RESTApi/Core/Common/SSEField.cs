@@ -10,6 +10,8 @@ namespace Glitch9.IO.RESTApi
         [ApiEnum("data")]
         Data,
         [ApiEnum("retry")]
-        Retry
+        Retry,
+        [ApiEnum("error")]
+        Error
     }
 }

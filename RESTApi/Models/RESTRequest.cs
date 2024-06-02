@@ -1,11 +1,12 @@
+using Glitch9.IO.Files;
 using Newtonsoft.Json;
+using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Glitch9.IO.Files;
-using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.Networking;
+
 
 namespace Glitch9.IO.RESTApi
 {
@@ -34,11 +35,6 @@ namespace Glitch9.IO.RESTApi
         [JsonIgnore] public ContentType ContentType { get; set; } = ContentType.Json;
 
         /// <summary>
-        /// (Optional) The content type of the request. Default is Json
-        /// </summary>
-        [JsonIgnore] public ContentType ResponseContentType { get; set; } = ContentType.Json;
-
-        /// <summary>
         /// (Required) Defines the target URL for the UnityWebRequest to communicate with
         /// </summary>
         [JsonIgnore] public string Endpoint { get; set; }
@@ -64,9 +60,9 @@ namespace Glitch9.IO.RESTApi
         [JsonIgnore] public int TimeoutInSec { get; set; } = DEFAULT_TIMEOUT_IN_SEC;
 
         /// <summary>
-        /// The type of the response. Default is Text
+        /// The type of the stream mode
         /// </summary>
-        [JsonIgnore] public DownloadMode DownloadMode { get; set; } = DownloadMode.Text;
+        [JsonIgnore] public StreamMode StreamMode { get; set; } = StreamMode.NoStream;
 
         /// <summary>
         /// The headers of the request
@@ -91,17 +87,17 @@ namespace Glitch9.IO.RESTApi
         /// <summary>
         /// The callback for the Text stream response
         /// </summary>
-        [JsonIgnore] public Action<string> OnTextStreamReceived { get; set; }
+        [JsonIgnore] public Action<string> OnStreamEvent { get; set; }
 
         /// <summary>
         /// The callback for the binary stream response
         /// </summary>
-        [JsonIgnore] public Action<byte[]> OnBinaryStreamReceived { get; set; }
+        [JsonIgnore] public Action<byte[]> OnBinaryStream { get; set; }
 
         /// <summary>
         /// The directory path where the file will be downloaded.
         /// </summary>
-        [JsonIgnore] public string FilePath { get; set; }
+        [JsonIgnore] public UnityFilePath DownloadPath { get; set; }
 
         /// <summary>
         /// This is only used locally.
@@ -131,9 +127,9 @@ namespace Glitch9.IO.RESTApi
             Headers.Add(header);
         }
 
-        public IEnumerable<RESTHeader> GetHeaders()
+        public IEnumerable<RESTHeader> GetHeaders(bool includeContentTypeHeader)
         {
-            yield return ContentType.GetHeader();
+            if (includeContentTypeHeader) yield return ContentType.GetHeader();
             foreach (RESTHeader header in Headers) yield return header;
         }
 
@@ -175,7 +171,7 @@ namespace Glitch9.IO.RESTApi
             return HashCode.Combine(Guid);
         }
 
-        
+
         public abstract class BaseApiReqBuilder<TBuilder, TReq>
             where TBuilder : BaseApiReqBuilder<TBuilder, TReq>
             where TReq : RESTRequest
@@ -228,16 +224,15 @@ namespace Glitch9.IO.RESTApi
             }
 
             /// <summary>
-            /// Set <see cref="RESTApi.DownloadMode"/> of the request. Default is <see cref="DownloadMode.Text"/>
+            /// Set the stream mode of the request. Default is None.
             /// </summary>
-            /// <param name="downloadMode"></param>
+            /// <param name="streamMode"></param>
             /// <returns></returns>
-            public TBuilder SetDownloadMode(DownloadMode downloadMode)
+            public TBuilder SetStreamMode(StreamMode streamMode)
             {
-                _req.DownloadMode = downloadMode;
+                _req.StreamMode = streamMode;
                 return (TBuilder)this;
             }
-
 
             /// <summary>
             /// Add an Authorization header to the request. Default header name is "Authorization".       
@@ -277,7 +272,7 @@ namespace Glitch9.IO.RESTApi
                     // check if the header with the same name already exists
                     if (_req.Headers.Exists(h => h.Name == header.Name))
                     {
-                        GNLog.Error($"[APIReq] {typeof(TReq).Name}: Header with the same name already exists: {header.Name}");
+                        RESTLog.RequestError($"{typeof(TReq).Name}: Header with the same name already exists: {header.Name}");
                         continue;
                     }
 
@@ -304,8 +299,8 @@ namespace Glitch9.IO.RESTApi
             /// <returns></returns>
             public TBuilder SetTextStream(Action<string> onTextStreamReceived)
             {
-                _req.DownloadMode = DownloadMode.TextStream;
-                _req.OnTextStreamReceived = onTextStreamReceived;
+                _req.StreamMode = StreamMode.TextStream;
+                _req.OnStreamEvent = onTextStreamReceived;
                 return (TBuilder)this;
             }
 
@@ -316,14 +311,20 @@ namespace Glitch9.IO.RESTApi
             /// <returns></returns>
             public TBuilder SetBinaryStream(Action<byte[]> onBinaryStreamReceived)
             {
-                _req.DownloadMode = DownloadMode.TextStream;
-                _req.OnBinaryStreamReceived = onBinaryStreamReceived;
+                _req.StreamMode = StreamMode.TextStream;
+                _req.OnBinaryStream = onBinaryStreamReceived;
                 return (TBuilder)this;
             }
 
-            public TBuilder SetFilePath(string filePath)
+            public TBuilder SetDownloadPath(UnityFilePath downloadPath)
             {
-                _req.FilePath = filePath;
+                _req.DownloadPath = downloadPath;
+                return (TBuilder)this;
+            }
+
+            public TBuilder SetDownloadPath(UnityPath unityPath, string subPath, ContentType contentType = ContentType.Json)
+            {
+                _req.DownloadPath = new(unityPath, subPath, contentType);
                 return (TBuilder)this;
             }
 
@@ -346,14 +347,8 @@ namespace Glitch9.IO.RESTApi
                 }
 
                 if (missingFields.Count <= 0) return true;
-                GNLog.Error($"[APIReq] {typeof(TReq).Name}: Missing required properties: {string.Join(", ", missingFields)}");
+                RESTLog.RequestError($"{typeof(TReq).Name}: Missing required properties: {string.Join(", ", missingFields)}");
                 return false;
-            }
-
-            public TBuilder SetReturnContentType(ContentType contentType)
-            {
-                _req.ResponseContentType = contentType;
-                return (TBuilder)this;
             }
 
             public virtual TReq Build()
@@ -368,7 +363,7 @@ namespace Glitch9.IO.RESTApi
                     _req.ContentType = contentType;
                     return _req;
                 }
-                GNLog.Error($"[APIReq] {typeof(TReq).Name}: Missing required properties");
+                RESTLog.RequestError($"{typeof(TReq).Name}: Missing required properties");
                 return null;
             }
         }

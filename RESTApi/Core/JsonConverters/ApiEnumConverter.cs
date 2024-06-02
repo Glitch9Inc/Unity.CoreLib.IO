@@ -1,30 +1,69 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
-using System.Linq;
 
 namespace Glitch9.IO.RESTApi
 {
     public class ApiEnumConverter : StringEnumConverter
     {
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        public static TEnum Parse<TEnum>(string value) where TEnum : Enum
         {
-            Type enumType = objectType;
-            if (Nullable.GetUnderlyingType(objectType) != null)
+            if (string.IsNullOrEmpty(value))
+                throw new JsonSerializationException("Null or empty string value has been passed to Parse<TEnum> method.");
+
+            Type enumType = typeof(TEnum);
+            if (!enumType.IsEnum)
+                throw new ArgumentException("Generic parameter TEnum must be an enum type.");
+
+            foreach (string name in Enum.GetNames(enumType))
             {
-                enumType = Nullable.GetUnderlyingType(objectType);
+                System.Reflection.FieldInfo field = enumType.GetField(name);
+                if (field == null)
+                    continue;
+
+                ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                if (attribute != null && value.Equals(attribute.ApiName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (TEnum)Enum.Parse(enumType, name);
+                }
+
+                if (value.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (TEnum)Enum.Parse(enumType, name);
+                }
             }
 
-            string[] names = Enum.GetNames(enumType);
-            foreach (string name in names)
-            {
-                System.Reflection.MemberInfo member = enumType.GetMember(name)[0];
-                ApiEnumAttribute attribute = member.GetCustomAttributes(typeof(ApiEnumAttribute), false)
-                    .Cast<ApiEnumAttribute>()
-                    .FirstOrDefault();
+            throw new JsonSerializationException($"Unknown enum value: {value}");
+        }
 
-                if ((attribute != null && reader.Value.ToString().Equals(attribute.ApiName)) ||
-                    reader.Value.ToString().Equals(name, StringComparison.OrdinalIgnoreCase))
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            if (objectType == null)
+                throw new ArgumentNullException(nameof(objectType));
+
+            Type enumType = Nullable.GetUnderlyingType(objectType) ?? objectType;
+
+            if (!enumType.IsEnum)
+                throw new JsonSerializationException($"Type {enumType.Name} is not an enum.");
+
+            string value = reader.Value?.ToString();
+            if (string.IsNullOrEmpty(value))
+                throw new JsonSerializationException("Null or empty string value has been passed to ReadJson method.");
+
+            foreach (var name in Enum.GetNames(enumType))
+            {
+                var field = enumType.GetField(name);
+                if (field == null)
+                    continue;
+
+                var attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                if (attribute != null && value.Equals(attribute.ApiName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Enum.Parse(enumType, name);
+                }
+
+                if (value.Equals(name, StringComparison.OrdinalIgnoreCase))
                 {
                     return Enum.Parse(enumType, name);
                 }
@@ -35,12 +74,13 @@ namespace Glitch9.IO.RESTApi
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            Type enumType = value.GetType();
+            Type enumType = value?.GetType();
+            if (enumType == null) throw new ArgumentNullException(nameof(value));
+
             string name = enumType.GetEnumName(value);
-            System.Reflection.MemberInfo member = enumType.GetMember(name)[0];
-            ApiEnumAttribute attribute = member.GetCustomAttributes(typeof(ApiEnumAttribute), false)
-                .Cast<ApiEnumAttribute>()
-                .FirstOrDefault();
+            if (string.IsNullOrEmpty(name)) throw new JsonSerializationException("Invalid enum value");
+
+            ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(enumType.GetField(name));
 
             string outputValue = attribute != null ? attribute.ApiName : name;
             writer.WriteValue(outputValue);

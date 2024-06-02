@@ -1,10 +1,9 @@
 using Cysharp.Threading.Tasks;
-using JetBrains.Annotations;
-using Newtonsoft.Json;
+using Glitch9.IO.Files;
 using System;
 using UnityEngine;
 using UnityEngine.Networking;
-
+using static Glitch9.IO.RESTApi.RESTClient;
 
 namespace Glitch9.IO.RESTApi
 {
@@ -23,62 +22,96 @@ namespace Glitch9.IO.RESTApi
         /// 
         /// 버전 3.3 업데이트: 2024-02-28 @Munchkin
         /// - TErr 추가 (에러오브젝트 기능)
+        ///
+        /// 버전 4.0 업데이트: 2024-05-28 @Munchkin
+        /// - 인터넷 연결 체크 함수 이동 (NetworkUtils.cs)
+        /// - 더이상 Exception을 catch하지않고 throw만 함
 
         #endregion
 
-        private const int NETWORK_CHECK_INTERVAL_IN_MILLIS = 500;
-        private static Version _version;
-
+        public const int MIN_INTERNAL_OPERATION_MILLIS = 1000;
+        
         /// <summary>
         /// Gets the version of the RESTApi library.
         /// </summary>
-        public static Version Version => _version ??= new Version("3.3.6");
+        public static Version Version => _version ??= new Version("4.0.0");
+        private static Version _version;
 
-        public static async UniTask CheckNetworkAsync()
+        /// <summary>
+        /// Sends a request and processes the response.
+        /// </summary>
+        /// <typeparam name="TReq">Request type.</typeparam>
+        /// <typeparam name="TRes">Response type.</typeparam>
+        /// <param name="request">Request object.</param>
+        /// <param name="method">HTTP method to use for the request.</param>
+        /// <param name="client">RESTClient instance.</param>
+        /// <returns>Response result.</returns>
+        internal static async UniTask<IResult> SendRequest<TReq, TRes>(TReq request, string method, RESTClient client)
+            where TReq : RESTRequest
+            where TRes : RESTObject, new()
         {
-            if (Application.internetReachability == NetworkReachability.NotReachable)
+            // Step 1. Validating request ==========================================================================================================================
+            if (request == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
+            if (string.IsNullOrEmpty(request.Endpoint)) throw new IssueException(Issue.InvalidEndpoint, "Endpoint is null or empty.");
+
+            if (client.LogRequestInfo) RESTLog.RequestInfo($"Sending {method} request to {request.Endpoint}.");
+            await NetworkUtils.CheckNetworkAsync(Config.NETWORK_CHECK_INTERVAL_IN_MILLIS, Config.NETWORK_CHECK_TIMEOUT_IN_MILLIS);
+            using UnityWebRequest webReq = UnityWebRequestFactory.Create(request, method, client.LogRequestBody, client.LogRequestHeaders, client.LogStreamEvents, client.JsonSettings);
+
+            if (webReq == null) throw new IssueException(Issue.InvalidRequest, "UnityWebRequest is null.");
+
+            // Step 2. Sending request =============================================================================================================================
+            await HandleUnityWebRequestResultAsync(webReq, request.RetryDelayInSec, request.MaxRetry);
+
+            // Step 3. Detect content type from the response ========================================================================================================
+            string contentTypeAsString = webReq.GetResponseHeader("Content-Type");
+            if (string.IsNullOrEmpty(contentTypeAsString)) throw new IssueException(Issue.EmptyResponse, "Content-Type is null or empty.");
+
+            // Step 4. Handling 'Stream' response ===================================================================================================================
+            bool isStream = request.StreamMode is StreamMode.TextStream or StreamMode.BinaryStream;
+            if (isStream)
             {
-                GNLog.Warning("Internet is not reachable. Waiting for network connection...");
-
-                await UniTask.RunOnThreadPool(() =>
-                {
-                    while (Application.internetReachability == NetworkReachability.NotReachable)
-                    {
-                        UniTask.Delay(NETWORK_CHECK_INTERVAL_IN_MILLIS); // Wait for half a second Before checking again
-                    }
-                });
-
-                GNLog.Info("Network connection re-established.");
+                // If it's a stream, everything is handled within the SendAndProcessRequest method
+                if (client.LogStreamEvents) RESTLog.RequestInfo("Stream has ended.");
+                return RESTObject.Done(); // Let the caller know that the stream has ended
             }
+
+            if (webReq.downloadHandler == null) throw new IssueException(Issue.EmptyResponse, "DownloadHandler is null.");
+            if (string.IsNullOrEmpty(webReq.downloadHandler.text)) throw new IssueException(Issue.EmptyResponse, "DownloadHandler text is null or empty.");
+
+            // Step 5. Handling response ============================================================================================================================
+            if (client.LogRequestInfo) RESTLog.RequestInfo($"Received response from {request.Endpoint}");
+
+            DataTransferMode returnTransferMode = DataTransferMode.Text;
+            if (request.DownloadPath != null) returnTransferMode = request.DownloadPath.Type.ToDataTransferMode();
+
+            if (returnTransferMode == DataTransferMode.Text)
+            {
+                if (client.LogRequestDetails) RESTLog.RequestDetails("Download Mode: Text");
+                string textResult = webReq.downloadHandler.text;
+
+                if (string.IsNullOrEmpty(textResult)) throw new IssueException(Issue.EmptyResponse, "Text result is null or empty.");
+                if (client.LogResponseBody) RESTLog.ResponseBody(textResult);
+
+                return await TextResponseConverter.ConvertAsync<TRes>(textResult, request.DownloadPath, client.JsonSettings);
+            }
+
+            if (returnTransferMode == DataTransferMode.Binary)
+            {
+                if (client.LogRequestDetails) RESTLog.RequestDetails("Download Mode: Binary");
+                byte[] binaryResult = webReq.downloadHandler.data;
+
+                if (binaryResult.IsNullOrEmpty()) throw new IssueException(Issue.EmptyResponse, "Binary result is null or empty.");
+
+                return await BinaryResponseConverter.ConvertAsync<TRes>(binaryResult, request.DownloadPath);
+            }
+
+            throw new IssueException(Issue.UnknownError);
         }
 
-        public static async UniTask<Result> SendAndProcessRequest<TErr>(UnityWebRequest request, float delayInSec, int retryCount)
+        public static async UniTask HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries)
         {
-            try
-            {
-                // Send the request for the first time
-                return await HandleUnityWebRequestResultAsync(request, delayInSec, retryCount);
-            }
-            catch (Exception ex) // Catching more general exception for broader coverage
-            {
-                string msg = ex.Message;
-                if (!string.IsNullOrEmpty(msg))
-                {
-                    TErr errorObject = JsonConvert.DeserializeObject<TErr>(msg);
-                    if (errorObject != null)
-                    {
-                        //TODO: Do something with the error object
-                    }
-                }
-                
-                GNLog.Error($"An error occurred during request: {ex.Message}");
-                return new Error(ex); // Assuming TaskResult.CreateError can handle general exceptions
-            }
-        }
-
-        public static async UniTask<Result> HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries)
-        {
-            if (request == null) return new Error("UnityWebRequest is null");
+            if (request == null) throw new ArgumentNullException(nameof(request));
 
             float currentDelay = baseDelayInSec;
             if (baseDelayInSec < 2) currentDelay = 2; // Minimum delay of 2 seconds
@@ -86,29 +119,22 @@ namespace Glitch9.IO.RESTApi
             for (int attempt = 0; attempt < maxRetries; ++attempt)
             {
                 if (request.isDone) break;
-                
-                try
-                {
-                    await request.SendWebRequest().ToUniTask();
 
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        return Result.Success();
-                    }
-   
-                    LogRequestError(request);
-                }
-                catch (Exception ex)
+                await request.SendWebRequest().ToUniTask();
+
+                if (request.result == UnityWebRequest.Result.Success)
                 {
-                    Debug.LogError($"Request failed: {ex.Message}");
-                    if (attempt == maxRetries - 1) throw; // Last attempt, rethrow exception
+                    return;
                 }
+
+                LogRequestError(request);
+                if (attempt == maxRetries - 1) break;
 
                 await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));
                 currentDelay *= 2; // Exponential backoff
             }
 
-            return new Error(Issue.RequestFailed);
+            throw new TimeoutException("UnityWebRequest did not complete successfully within the specified number of retries.");
         }
 
         private static void LogRequestError(UnityWebRequest request)
@@ -128,19 +154,6 @@ namespace Glitch9.IO.RESTApi
                     Debug.LogWarning("Unknown error occurred.");
                     break;
             }
-        }
-
-        public static bool TryGetError<TErr>(string resultAsString, JsonSerializerSettings jsonSettings, [CanBeNull] out TErr error)
-            where TErr : Error, new()
-        {
-            if (!resultAsString.Search("error :"))
-            {
-                error = null;
-                return false;
-            }
-
-            error = JsonConvert.DeserializeObject<TErr>(resultAsString, jsonSettings);
-            return error != null;
         }
     }
 }

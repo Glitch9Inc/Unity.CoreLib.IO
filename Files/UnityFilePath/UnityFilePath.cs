@@ -9,7 +9,7 @@ namespace Glitch9.IO.Files
     /// A wrapper for file paths that can be serialized to JSON.
     /// </summary>
     [Serializable]
-    public class FilePath
+    public class UnityFilePath
     {
         [SerializeField] private string id;
         [FormerlySerializedAs("type")][SerializeField] private UnityPath unityPath;
@@ -29,12 +29,22 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Gets the file path.
         /// </summary>
-        [JsonIgnore] public string Path => path;
+        [JsonIgnore]
+        public string Path
+        {
+            get => path;
+            set => path = value;
+        }
 
         /// <summary>
         /// Gets the content type of the file.
         /// </summary>
-        [JsonIgnore] public ContentType Type => type;
+        [JsonIgnore]
+        public ContentType Type
+        {
+            get => type;
+            set => type = value;
+        }
 
         /// <summary>
         /// Gets the file name.
@@ -44,20 +54,29 @@ namespace Glitch9.IO.Files
         private string _fileName;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="FilePath"/> class.
+        /// Initializes a new instance of the <see cref="UnityFilePath"/> class.
         /// </summary>
         [JsonConstructor]
-        public FilePath() { }
+        public UnityFilePath() { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="FilePath"/> class with the specified Unity path type and file path.
+        /// Initializes a new instance of the <see cref="UnityFilePath"/> class with the specified Unity path type and file path.
         /// </summary>
         /// <param name="unityPath">The Unity path type.</param>
         /// <param name="path">The file path.</param>
-        public FilePath(UnityPath unityPath, string path)
+        /// <param name="fileType">The content type of the file.</param>
+        public UnityFilePath(UnityPath unityPath, string path, ContentType fileType = ContentType.Json)
         {
             this.unityPath = unityPath;
             this.path = path;
+            this.type = fileType;
+            //type = fileType ?? ContentTypeUtils.ParseFileExtension(path);
+        }
+
+        public bool FileExists()
+        {
+            string localPath = this.GetLocalPath();
+            return System.IO.File.Exists(localPath);
         }
     }
 }

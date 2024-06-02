@@ -34,7 +34,7 @@ namespace Glitch9.IO.Files
             return Convert.ToBase64String(binaryData);
         }
 
-        public static async UniTask<Texture2D> LoadTexture(FilePath filePath)
+        public static async UniTask<Texture2D> LoadTexture(UnityFilePath filePath)
         {
             if (filePath == null) return null;
             return await LoadTexture(filePath.Path, filePath.UnityPath);
@@ -77,7 +77,7 @@ namespace Glitch9.IO.Files
 
         private static async UniTask<Texture2D> LoadTextureFromLocal(string filePath)
         {
-            if (!await FilePathResolver.Exists(filePath)) return null;
+            if (!await FilePathResolver.DelayedExists(filePath)) return null;
             byte[] fileData = await File.ReadAllBytesAsync(filePath);
             Texture2D texture = new(2, 2);
             texture.LoadImage(fileData);

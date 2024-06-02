@@ -25,7 +25,8 @@ namespace Glitch9.IO.RESTApi
             }
         }
 
-        public static TEnum ParseEnumFromApiName<TEnum>(string rawName) where TEnum : Enum
+        public static TEnum ParseEnum<TEnum>(string apiName) 
+            where TEnum : Enum
         {
             foreach (FieldInfo field in typeof(TEnum).GetFields())
             {
@@ -33,13 +34,15 @@ namespace Glitch9.IO.RESTApi
 
                 if (attribute != null)
                 {
-                    if (attribute.ApiName == rawName)
+                    if (attribute.ApiName == apiName)
                     {
                         return (TEnum)field.GetValue(null);
                     }
                 }
             }
-            throw new ArgumentException($"'{rawName}' is not a valid value for {typeof(TEnum).Name}.");
+
+            //throw new ArgumentException($"'{apiName}' is not a valid value for {typeof(TEnum).Name}.");
+            return default;    // return default value instead
         }
     }
 }

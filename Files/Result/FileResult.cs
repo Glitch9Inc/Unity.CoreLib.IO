@@ -2,7 +2,7 @@
 namespace Glitch9.IO.Files
 {
     public class FileResult<TBaseFile> : Result
-        where TBaseFile : BaseFile<TBaseFile>
+        where TBaseFile : UnityFileBase<TBaseFile>
     {
         /// <summary>
         /// The file is being loaded.

@@ -3,41 +3,38 @@ using Glitch9.IO.Files;
 
 namespace Glitch9.IO.RESTApi
 {
-    public static class BinaryResponseConverter
+    internal static class BinaryResponseConverter
     {
-        public static async UniTask<TRes> ConvertAsync<TRes>(
+        internal static async UniTask<TRes> ConvertAsync<TRes>(
             byte[] result, 
-            string resultAsString, 
-            string filePath, 
-            ContentType contentType) where TRes : RESTResult, new()
+            UnityFilePath downloadPath) where TRes : RESTObject, new()
         {
-            // result cannot be null at this point. no need to check for null
-            TRes response = new() { BinaryResult = result, TextResult = resultAsString };
+            Validate.Argument.NotNull(downloadPath);
+            
+            // Result cannot be null at this point. No need to check for null
+            TRes response = new() { BinaryResult = result };
 
-            // TODO: Convert the byte array to the appropriate type
-            if (contentType is ContentType.Png or ContentType.Jpeg)
+            // Converting the byte array to the appropriate type
+            switch (downloadPath.Type)
             {
-                RESTLog.ResponseError($"{contentType} will be supported soon.");
-            }
-            else if (contentType == ContentType.Gif)
-            {
-                RESTLog.ResponseError("GIF is not supported. Texture2D will not be created.");
-            }
-            else if (contentType == ContentType.Mpeg)
-            {
-                response.AudioResult = await AudioConverter.MPEGToAudioClip(result, filePath);
-            }
-            else if (contentType == ContentType.Wav)
-            {
-                response.AudioResult = await AudioConverter.WAVToAudioClip(result, filePath);
-            }
-            else
-            {
-                RESTLog.ResponseError($"{contentType} is not supported. Result object will not be created.");
+                case ContentType.Png or ContentType.Jpeg:
+                    response.ImageResult = ImageConverter.BinaryToTexture2D(result);
+                    break;
+                case ContentType.Gif:
+                    RESTLog.ResponseError("GIF is not supported. Texture2D will not be created.");
+                    break;
+                case ContentType.Mpeg:
+                    response.AudioResult = await AudioConverter.MPEGToAudioClip(result, downloadPath.GetLocalPath());
+                    break;
+                case ContentType.Wav:
+                    response.AudioResult = await AudioConverter.WAVToAudioClip(result, downloadPath.GetLocalPath());
+                    break;
+                default:
+                    response.FileResult = await BinaryConverter.ToBinaryFile(result, downloadPath.GetLocalPath());
+                    break;
             }
 
             await UniTask.Delay(1000);
-            response.OnResponseConverted(resultAsString);
             return response;
         }
     }

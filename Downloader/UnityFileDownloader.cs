@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using Glitch9.IO.Files;
 using System;
 using System.IO;
 using System.Linq;
@@ -9,9 +10,9 @@ using UnityEngine.Networking;
 
 namespace Glitch9.IO
 {
-    public class Downloader
+    public class UnityFileDownloader
     {
-        private const int MAX_DL_FAIL_COUNT = 5;
+        private const int MAX_DL_FAIL_COUNT = 3;
 
         public static async UniTask<bool> DownloadFileAsync(string uri, string dlLocalPath)
         {
@@ -21,13 +22,12 @@ namespace Glitch9.IO
 
         private static async UniTask<bool> DownloadWithRetryAsync(Uri uri, string dlPath)
         {
-            // Idk why but I make this mistake a lot.
-            dlPath = dlPath.Replace("//", "/");
+            dlPath = dlPath.Replace("//", "/"); // Idk why but I make this mistake a lot.
 
             string dir = Path.GetDirectoryName(dlPath);
             GNLog.Info($"Download Dir: {dir} | Download Path: {dlPath}");
-            
-            if (!Directory.Exists(dir))
+
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             {
                 GNLog.Info($"Creating directory: {dir}");
                 Directory.CreateDirectory(dir);
@@ -36,8 +36,16 @@ namespace Glitch9.IO
             int attempt = 0;
             while (attempt < MAX_DL_FAIL_COUNT)
             {
-                if (await TryDownloadAsync(uri, dlPath)) return true;
-                else attempt++;
+                try
+                {
+                    if (await TryDownloadAsync(uri, dlPath)) return true;
+                }
+                catch (Exception e)
+                {
+                    GNLog.Error($"Failed to download the file from <color=blue>{uri}</color>.\nError: {e.Message}");
+                }
+
+                attempt++;
             }
 
             DisplayEditorDialogue($"Failed to download the file after {MAX_DL_FAIL_COUNT} attempts from <color=blue>{uri}</color>.");
@@ -54,6 +62,7 @@ namespace Glitch9.IO
                 string ext = Path.GetExtension(dlLocalPath);
                 string fileName = Path.GetFileNameWithoutExtension(dlLocalPath);
                 string dir = Path.GetDirectoryName(dlLocalPath);
+                if (string.IsNullOrEmpty(dir)) return false; // This should never happen but just in case :
 
                 string[] files = Directory.GetFiles(dir, $"{fileName}*{ext}");
                 if (files.Length > 0)
@@ -70,23 +79,8 @@ namespace Glitch9.IO
             UnityWebRequestAsyncOperation operation = www.SendWebRequest();
             operation.completed += _ =>
             {
-                if (www == null)
-                {
-                    DisplayEditorDialogue("Download failed. UnityWebRequest is null.");
-                    completionSource.SetResult(false);
-                    return;
-                }
-
-                if (www.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.ProtocolError)
-                {
-                    DisplayEditorDialogue("Download failed: " + uri + "\nError:" + www.error);
-                    completionSource.SetResult(false);
-                }
-                else
-                {
-                    DisplayEditorDialogue($"The file is successfully downloaded to <color=blue>{dlLocalPath}</color>.");
-                    completionSource.SetResult(true);
-                }
+                DisplayEditorDialogue($"The file is successfully downloaded to <color=blue>{dlLocalPath}</color>.");
+                completionSource.SetResult(true);
             };
 
             return await completionSource.Task;
@@ -124,43 +118,18 @@ namespace Glitch9.IO
 
         #region Audio Download
 
-        private static AudioType GetAudioType(string extensionString)
-        {
-            switch (extensionString)
-            {
-                case "wav": return AudioType.WAV;
-                case "mp3": return AudioType.MPEG;
-                case "ogg": return AudioType.OGGVORBIS;
-                case "aif":
-                case "aiff": return AudioType.AIFF;
-                case "acc": return AudioType.ACC;
-                case "it": return AudioType.IT;
-                case "mod": return AudioType.MOD;
-                case "s3m": return AudioType.S3M;
-                case "xm": return AudioType.XM;
-                case "xma": return AudioType.XMA;
-                case "vag": return AudioType.VAG;
-                default:
-                    DisplayEditorDialogue($"Unsupported Audio Format: {extensionString}", true);
-                    return AudioType.UNKNOWN;
-            }
-        }
-
         public static async UniTask<AudioClip> DownloadAudioClipAsync(string uri, string dlLocalPath, FileExt extension = FileExt.Unset)
         {
             if (!TryCreateUri(uri, out Uri result)) return null;
 
             string extensionString = GetExtensionString(result, extension);
-            AudioType audioType = GetAudioType(extensionString);
+            AudioType audioType = AudioUtils.GetAudioTypeFromFileExtension(extensionString);
 
             if (await DownloadWithRetryAsync(result, dlLocalPath))
             {
                 return await LoadAudioClipAsync(dlLocalPath, audioType);
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
         public static async UniTask<AudioClip> DownloadLiveAudioClipAsync(string httpUrl, FileExt extension = FileExt.Unset)
@@ -168,7 +137,7 @@ namespace Glitch9.IO
             if (!TryCreateUri(httpUrl, out Uri result)) return null;
 
             string extensionString = GetExtensionString(result, extension);
-            AudioType audioType = GetAudioType(extensionString);
+            AudioType audioType = AudioUtils.GetAudioTypeFromFileExtension(extensionString);
 
             StringBuilder dlPathSb = new();
             dlPathSb.Append(Application.persistentDataPath);
@@ -180,10 +149,7 @@ namespace Glitch9.IO
             {
                 return await LoadAudioClipAsync(dlPath, audioType);
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
         private static async UniTask<AudioClip> LoadAudioClipAsync(string dlLocalPath, AudioType audioType)
@@ -200,11 +166,9 @@ namespace Glitch9.IO
                 DisplayEditorDialogue("Download failed: " + dlLocalPath + "\nError:" + www.error);
                 return null;
             }
-            else
-            {
-                DisplayEditorDialogue($"The file is successfully loaded from <color=blue>{dlLocalPath}</color>.");
-                return DownloadHandlerAudioClip.GetContent(www);
-            }
+            
+            DisplayEditorDialogue($"The file is successfully loaded from <color=blue>{dlLocalPath}</color>.");
+            return DownloadHandlerAudioClip.GetContent(www);
         }
 
         #endregion
@@ -219,10 +183,7 @@ namespace Glitch9.IO
             {
                 return await LoadTextureAsync(dlLocalPath);
             }
-            else
-            {
-                return null;
-            }
+            return null;
         }
 
         private static async UniTask<Texture2D> LoadTextureAsync(string dlLocalPath)

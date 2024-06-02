@@ -165,7 +165,7 @@ namespace Glitch9.IO.Files
             }
         }
 
-        public static async UniTask<AudioClip> LoadAudioClip(FilePath filePath)
+        public static async UniTask<AudioClip> LoadAudioClip(UnityFilePath filePath)
         {
             if (filePath == null) return null;
             return await LoadAudioClip(filePath.Path, filePath.UnityPath);
@@ -185,25 +185,25 @@ namespace Glitch9.IO.Files
 
             if (path == UnityPath.URL)
             {
-                return await LoadAudioClipFromUri(filePath);
+                return await LoadAudioClipFromFilePath(filePath);
             }
 
             filePath = FilePathResolver.ResolveUnityWebRequestLocalPath(path, filePath);
-            if (!await FilePathResolver.Exists(filePath)) return null;
+            if (!await FilePathResolver.DelayedExists(filePath)) return null;
             
             if (!filePath.StartsWith("file://")) filePath = "file://" + filePath;
             filePath = filePath.Replace("\\", "/");
    
-            return await LoadAudioClipFromUri(filePath);
+            return await LoadAudioClipFromFilePath(filePath);
         }
 
-        private static async UniTask<AudioClip> LoadAudioClipFromUri(string uri)
+        private static async UniTask<AudioClip> LoadAudioClipFromFilePath(string filePath)
         {
-            AudioType audioType = ResolveAudioTypeFromUri(uri);
-            Debug.Log($"Loading audio clip from URI: {uri} AudioType: {audioType}");
+            AudioType audioType = AudioUtils.GetAudioTypeFromFilePath(filePath);
+            Debug.Log($"Loading audio clip from file path: {filePath} AudioType: {audioType}");
 
             // UnityWebRequest를 사용하여 텍스처를 비동기적으로 로드합니다.
-            using UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(uri, audioType);
+            using UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(filePath, audioType);
             
             // SendWebRequest 대신 await를 사용합니다.
             await www.SendWebRequest().WithCancellation(CancellationToken.None);
@@ -220,24 +220,6 @@ namespace Glitch9.IO.Files
                 // 성공적으로 로드된 경우, 다운로드된 텍스처를 반환합니다.
                 return DownloadHandlerAudioClip.GetContent(www);
             }
-        }
-
-        private static AudioType ResolveAudioTypeFromUri(string filePath)
-        {
-            string extension = Path.GetExtension(filePath).ToLower();
-            return extension switch
-            {
-                ".mp3" => AudioType.MPEG,
-                ".wav" => AudioType.WAV,
-                ".ogg" => AudioType.OGGVORBIS,
-                ".aif" => AudioType.AIFF,
-                ".aiff" => AudioType.AIFF,
-                ".mod" => AudioType.MOD,
-                ".it" => AudioType.IT,
-                ".s3m" => AudioType.S3M,
-                ".xm" => AudioType.XM,
-                _ => AudioType.UNKNOWN
-            };
         }
     }
 }

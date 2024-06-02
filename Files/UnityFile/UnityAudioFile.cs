@@ -5,9 +5,9 @@ using UnityEngine;
 namespace Glitch9.IO.Files
 {
     [Serializable]
-    public class ImageFile : BaseFile<Texture2D>
+    public class UnityAudioFile : UnityFileBase<AudioClip>
     {
-        protected override async UniTask<Texture2D> LoadFileAsync() => await ImageConverter.LoadTexture(Path);
+        protected override async UniTask<AudioClip> LoadFileAsync() => await AudioConverter.LoadAudioClip(Path);
         protected override byte[] ToBytes() => Value.ToBytes();
     }
 }

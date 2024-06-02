@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Glitch9.IO.RESTApi
@@ -8,26 +7,26 @@ namespace Glitch9.IO.RESTApi
     public class TextStreamHandlerBuffer : DownloadHandlerScript
     {
         /// <summary>
-        ///     The event to subscribe to for receiving data chunks
+        /// The event to subscribe to for receiving data chunks
         /// </summary>
         private readonly Action<string> _onDataChunkReceived;
         private readonly Action<float> _onProgressChanged;
-        private readonly bool _logStreamedData;
+        private readonly bool _logStreamEvents;
 
         /// <summary>
-        ///     Temporary buffer for storing incomplete characters between data chunks
+        /// Temporary buffer for storing incomplete characters between data chunks
         /// </summary>
         private byte[] _leftoverBytes;
 
-        public TextStreamHandlerBuffer(Action<string> onDataChunkReceived, Action<float> onProgressChanged = null, bool logStreamedData = false) : base()
+        public TextStreamHandlerBuffer(Action<string> onDataChunkReceived, Action<float> onProgressChanged = null, bool logStreamEvents = false) : base()
         {
             _onDataChunkReceived = onDataChunkReceived;
             _onProgressChanged = onProgressChanged;
-            _logStreamedData = logStreamedData;
+            _logStreamEvents = logStreamEvents;
         }
 
         /// <summary>
-        ///     Implement if needed to report progress
+        /// Implement if needed to report progress
         /// </summary>
         /// <returns></returns>
         protected override float GetProgress()
@@ -40,30 +39,29 @@ namespace Glitch9.IO.RESTApi
         /// <summary>
         /// This method is called whenever data is received
         /// </summary>
-        /// <param name="data"></param>
+        /// <param name="streamedData"></param>
         /// <param name="dataLength"></param>
         /// <returns></returns>
-        protected override bool ReceiveData(byte[] data, int dataLength)
+        protected override bool ReceiveData(byte[] streamedData, int dataLength)
         {
-            if (data == null || dataLength == 0) return false;
+            if (streamedData == null || dataLength == 0) return false;
 
-            byte[] fullDataChunk = data;
+            byte[] fullDataChunk = streamedData;
             if (_leftoverBytes != null && _leftoverBytes.Length > 0)
             {
                 // Combine leftover bytes from the previous chunk with the current chunk
                 fullDataChunk = new byte[_leftoverBytes.Length + dataLength];
                 Buffer.BlockCopy(_leftoverBytes, 0, fullDataChunk, 0, _leftoverBytes.Length);
-                Buffer.BlockCopy(data, 0, fullDataChunk, _leftoverBytes.Length, dataLength);
+                Buffer.BlockCopy(streamedData, 0, fullDataChunk, _leftoverBytes.Length, dataLength);
                 _leftoverBytes = null;
             }
 
-            // byte[] => string
             // Try to convert the bytes to string
-            string text = Encoding.UTF8.GetString(fullDataChunk);
-            if (_logStreamedData) Debug.Log($"Received data: {text}");
+            string encodedText = Encoding.UTF8.GetString(fullDataChunk);
+            if (_logStreamEvents) RESTLog.StreamedData($"Received data: {encodedText}");
 
-            _onDataChunkReceived?.Invoke(text);
             // Here, you should invoke the onDataChunkReceived event or callback with the Text
+            _onDataChunkReceived?.Invoke(encodedText);
 
             // Check if the last byte potentially begins a multibyte character
             int lastFullCharIndex = GetLastFullCharIndex(fullDataChunk);
@@ -79,15 +77,15 @@ namespace Glitch9.IO.RESTApi
         }
 
         /// <summary>
-        ///     Called when all data has been received
+        /// Called when all data has been received
         /// </summary>
         protected override void CompleteContent()
         {
-            if (_logStreamedData) Debug.Log("<color=blue>Stream complete!</color>");
+            if (_logStreamEvents) RESTLog.StreamedData("<color=blue>Stream complete!</color>");
         }
 
         /// <summary>
-        ///     Utility method to find the index of the last full character in a byte array
+        /// Utility method to find the index of the last full character in a byte array
         /// </summary>
         /// <param name="bytes"></param>
         /// <returns></returns>

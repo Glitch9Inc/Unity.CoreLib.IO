@@ -1,32 +1,48 @@
+using Glitch9.IO.Files;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Text;
-using Glitch9.IO.Files;
 using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Glitch9.IO.RESTApi
 {
-    public static class UnityWebRequestUtils
+    internal class UnityWebRequestFactory
     {
-        public static UnityWebRequest CreateUnityWebRequest<TReq>(this TReq req, string method, bool logBody, bool logHeaders, JsonSerializerSettings jsonSettings = null)
+        internal static UnityWebRequest Create<TReq>(TReq req, string method, bool logBody, bool logHeaders, bool logStreamEvents, JsonSerializerSettings jsonSettings = null)
             where TReq : RESTRequest
         {
             if (req == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
             if (req.WebRequest != null) return req.WebRequest;
 
-            EncodeBody(req, method, logBody, jsonSettings);
+            EncodeBody(req, method, logBody, logStreamEvents, jsonSettings);
+            bool includeContentTypeHeader = req.ContentType == ContentType.Json;
 
-            foreach (RESTHeader header in req.GetHeaders())
+            if (logHeaders)
             {
-                if (logHeaders) RESTLog.RequestHeader($"{header.Name} : {header.Value}");
-                req.WebRequest.SetRequestHeader(header);
+                using (StringBuilderPool.Get(out StringBuilder sb))
+                {
+                    foreach (RESTHeader header in req.GetHeaders(includeContentTypeHeader))
+                    {
+                        sb.AppendLine($"{header.Name}: {header.Value}");
+                        req.WebRequest.SetRequestHeader(header);
+                    }
+
+                    RESTLog.RequestHeaders(sb.ToString());
+                }
+            }
+            else
+            {
+                foreach (RESTHeader header in req.GetHeaders(includeContentTypeHeader))
+                {
+                    req.WebRequest.SetRequestHeader(header);
+                }
             }
 
             return req.WebRequest;
         }
 
-        private static void EncodeBody<TReq>(TReq req, string method, bool logBody, JsonSerializerSettings jsonSettings = null)
+        private static void EncodeBody<TReq>(TReq req, string method, bool logBody, bool logStreamEvents, JsonSerializerSettings jsonSettings = null)
             where TReq : RESTRequest
         {
             string url = req.Endpoint;
@@ -34,10 +50,10 @@ namespace Glitch9.IO.RESTApi
 
             if (contentType == ContentType.Json)
             {
-                DownloadHandler downloadHandler = req.DownloadMode switch
+                DownloadHandler downloadHandler = req.StreamMode switch
                 {
-                    DownloadMode.TextStream => new TextStreamHandlerBuffer(req.OnTextStreamReceived, req.OnProgressChanged),
-                    DownloadMode.BinaryStream => new BinaryStreamHandlerBuffer(req.OnBinaryStreamReceived, req.OnProgressChanged),
+                    StreamMode.TextStream => new TextStreamHandlerBuffer(req.OnStreamEvent, req.OnProgressChanged, logStreamEvents),
+                    StreamMode.BinaryStream => new BinaryStreamHandlerBuffer(req.OnBinaryStream, req.OnProgressChanged, logStreamEvents),
                     _ => new DownloadHandlerBuffer()
                 };
 
@@ -62,28 +78,19 @@ namespace Glitch9.IO.RESTApi
             {
                 WWWForm form = req.Form;
                 if (form == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode form data of this request.");
+                //else if (logBody) RESTLog.RequestBody($"WWWForm: \r\n {form}");
                 req.WebRequest = UnityWebRequest.Post(url, form);
             }
             else if (contentType == ContentType.MultipartForm)
             {
-                List<IMultipartFormSection> formData = req.ToForm();
+                List<IMultipartFormSection> formData = req.ToMultipartFormSections(logBody);
                 if (formData == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode form data of this request.");
                 req.WebRequest = UnityWebRequest.Post(url, formData);
             }
             else
             {
-                throw new IssueException(Issue.InvalidRequest, "Unsupported content type.");
+                throw new IssueException(Issue.InvalidRequest, $"Unsupported content type: {contentType}");
             }
-        }
-
-        private static byte[] ToJson<TReq>(this TReq req, bool logBody, JsonSerializerSettings settings)
-            where TReq : RESTRequest
-        {
-            if (req == null) return null;
-            string bodyString = JsonConvert.SerializeObject(req, settings);
-            if (string.IsNullOrEmpty(bodyString)) return null;
-            if (logBody) RESTLog.RequestBody(bodyString);
-            return Encoding.UTF8.GetBytes(bodyString);
         }
     }
 }

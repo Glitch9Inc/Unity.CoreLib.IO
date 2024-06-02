@@ -12,7 +12,7 @@ namespace Glitch9.IO.RESTApi
         public string FileName { get; set; }
         public ContentType ContentType { get; set; } // MIME 타입을 저장할 문자열 프로퍼티
 
-        public FormFile(byte[] data, string fileName, ContentType contentType = ContentType.OctetStream)
+        public FormFile(byte[] data, string fileName, ContentType contentType = ContentType.Json)
         {
             if (data == null || data.Length == 0) throw new ArgumentException("Data cannot be null or empty", nameof(data));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
@@ -21,7 +21,7 @@ namespace Glitch9.IO.RESTApi
             ContentType = contentType;
         }
 
-        public FormFile(Sprite sprite, string fileName, ContentType contentType = ContentType.Png)
+        public FormFile(Sprite sprite, string fileName, ContentType contentType = ContentType.Json)
         {
             if (sprite == null) throw new ArgumentException("Sprite cannot be null", nameof(sprite));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
@@ -30,7 +30,7 @@ namespace Glitch9.IO.RESTApi
             ContentType = contentType;
         }
 
-        public FormFile(Texture2D texture, string fileName, ContentType contentType = ContentType.Png)
+        public FormFile(Texture2D texture, string fileName, ContentType contentType = ContentType.Json)
         {
             if (texture == null) throw new ArgumentException("Texture cannot be null", nameof(texture));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
@@ -39,7 +39,7 @@ namespace Glitch9.IO.RESTApi
             ContentType = contentType;
         }
 
-        public FormFile(AudioClip audioClip, string fileName, ContentType contentType = ContentType.OctetStream)
+        public FormFile(AudioClip audioClip, string fileName, ContentType contentType = ContentType.Json)
         {
             if (audioClip == null) throw new ArgumentException("AudioClip cannot be null", nameof(audioClip));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
@@ -48,7 +48,7 @@ namespace Glitch9.IO.RESTApi
             ContentType = contentType;
         }
 
-        public FormFile(string filePath, ContentType contentType = ContentType.OctetStream)
+        public FormFile(string filePath, ContentType contentType = ContentType.Json)
         {
             if (string.IsNullOrEmpty(filePath)) throw new ArgumentException("FilePath cannot be null or empty", nameof(filePath));
             Data = File.ReadAllBytes(filePath);
@@ -56,7 +56,7 @@ namespace Glitch9.IO.RESTApi
             ContentType = contentType;
         }
 
-        public FormFile(string filePath, string fileName, ContentType contentType = ContentType.OctetStream)
+        public FormFile(string filePath, string fileName, ContentType contentType = ContentType.Json)
         {
             if (string.IsNullOrEmpty(filePath)) throw new ArgumentException("FilePath cannot be null or empty", nameof(filePath));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
@@ -68,19 +68,19 @@ namespace Glitch9.IO.RESTApi
 
     public static class FormFileExtensions
     {
-        public static FormFile ToFormFile(this AudioFile audioFile)
+        public static FormFile ToFormFile(this UnityAudioFile audioFile)
         {
             return new FormFile(audioFile.Value, audioFile.FileName);
         }
 
-        public static FormFile ToFormFile(this ImageFile imageFile)
+        public static FormFile ToFormFile(this UnityImageFile imageFile)
         {
             return new FormFile(imageFile.Value, imageFile.FileName);
         }
 
-        public static FormFile ToFormFile(this BinaryFile binaryFile)
+        public static FormFile ToFormFile(this UnityFile unityFile)
         {
-            return new FormFile(binaryFile.Value, binaryFile.FileName);
+            return new FormFile(unityFile.Value, unityFile.FileName);
         }
     }
 }
