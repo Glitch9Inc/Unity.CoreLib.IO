@@ -40,12 +40,12 @@ namespace Glitch9.IO.Json.Schema
             return popped;
         }
 
-        public JsonSchema Generate(Type type, bool required = false)
+        public JsonSchema Generate(Type type)
         {
-            return GenerateInternal(type, required);
+            return GenerateInternal(type);
         }
 
-        private JsonSchema GenerateInternal(Type type, bool required = false)
+        private JsonSchema GenerateInternal(Type type)
         {
             if (_stack.Any(tc => tc.Type == type))
             {
@@ -71,7 +71,7 @@ namespace Glitch9.IO.Json.Schema
             }
             else if (type == typeof(bool))
             {
-                CurrentSchema.Type = JsonSchemaType.Boolean;
+                CurrentSchema.Type = JsonSchemaType.Bool;
             }
             else if (type == typeof(DateTime))
             {
@@ -80,7 +80,7 @@ namespace Glitch9.IO.Json.Schema
             }
             else if (type.IsEnum)
             {
-                CurrentSchema.Type = JsonSchemaType.String;
+                CurrentSchema.Type = JsonSchemaType.Enum;
                 CurrentSchema.Enum = Enum.GetNames(type).ToList();
             }
             else if (type.IsClass)

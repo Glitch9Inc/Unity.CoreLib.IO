@@ -20,7 +20,7 @@ namespace Glitch9.IO.Json.Schema
             _writer.WriteStartObject();
 
             WritePropertyIfNotNull("description", schema.Description);
-            WritePropertyIfNotNull("type", schema.Type);
+            WritePropertyIfNotNull("type", JsonSchemaTypes.GetValue(schema.Type));
             WritePropertyIfNotNull("format", schema.Format);
 
             if (schema.Properties != null)

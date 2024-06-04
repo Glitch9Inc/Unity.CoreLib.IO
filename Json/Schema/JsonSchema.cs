@@ -7,7 +7,7 @@ namespace Glitch9.IO.Json.Schema
 {
     public class JsonSchema
     {
-        [JsonProperty("type")] public string Type { get; set; }
+        [JsonProperty("type")] public JsonSchemaType Type { get; set; }
         [JsonProperty("description")] public string Description { get; set; }
         [JsonProperty("format")] public string Format { get; set; }
         [JsonProperty("properties")] public Dictionary<string, JsonSchema> Properties { get; set; }
@@ -17,8 +17,9 @@ namespace Glitch9.IO.Json.Schema
 
         public static JsonSchema Read(JsonReader reader)
         {
-            JsonSchemaBuilder jsonSchemaBuilder = new();
-            return jsonSchemaBuilder.Read(reader);
+            if (reader == null) throw new System.ArgumentNullException(nameof(reader));
+            JsonSchemaReader jsonSchemaReader = new();
+            return jsonSchemaReader.Read(reader);
         }
 
         public void WriteTo(JsonWriter writer)

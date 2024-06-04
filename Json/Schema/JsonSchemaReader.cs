@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Glitch9.IO.Json.Schema
 {
-    internal class JsonSchemaBuilder
+    internal class JsonSchemaReader
     {
         public JsonSchema Read(JsonReader reader)
         {
@@ -14,10 +14,12 @@ namespace Glitch9.IO.Json.Schema
 
         private JsonSchema ParseSchema(JObject obj)
         {
+            string typeString = (string)obj["type"];
+            JsonSchemaType jsonSchemaType;
+
             JsonSchema schema = new()
             {
                 Description = (string)obj["description"],
-                Type = (string)obj["type"],
                 Format = (string)obj["format"]
             };
 
@@ -37,7 +39,15 @@ namespace Glitch9.IO.Json.Schema
                 {
                     schema.Enum.Add(token.ToString());
                 }
+
+                jsonSchemaType = JsonSchemaType.Enum;
             }
+            else
+            {
+                jsonSchemaType = JsonSchemaTypes.Parse(typeString);
+            }
+
+            schema.Type = jsonSchemaType;
 
             if (obj["required"] is JArray requiredArray)
             {
