@@ -6,11 +6,12 @@ namespace Glitch9.IO.RESTApi
     internal static class BinaryResponseConverter
     {
         internal static async UniTask<TRes> ConvertAsync<TRes>(
-            byte[] result, 
-            UnityFilePath downloadPath) where TRes : RESTObject, new()
+            byte[] result,
+            UnityFilePath downloadPath,
+            RESTClient client) where TRes : RESTObject, new()
         {
             Validate.Argument.NotNull(downloadPath);
-            
+
             // Result cannot be null at this point. No need to check for null
             TRes response = new() { BinaryResult = result };
 
@@ -21,7 +22,7 @@ namespace Glitch9.IO.RESTApi
                     response.ImageResult = ImageConverter.BinaryToTexture2D(result);
                     break;
                 case ContentType.Gif:
-                    RESTLog.ResponseError("GIF is not supported. Texture2D will not be created.");
+                    client.InternalLogger.ResponseError("GIF is not supported. Texture2D will not be created.");
                     break;
                 case ContentType.Mpeg:
                     response.AudioResult = await AudioConverter.MPEGToAudioClip(result, downloadPath.GetLocalPath());

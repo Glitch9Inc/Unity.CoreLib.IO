@@ -1,6 +1,6 @@
 using Glitch9.IO.Files;
+using Glitch9.IO.Json;
 using Newtonsoft.Json;
-using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -272,7 +272,7 @@ namespace Glitch9.IO.RESTApi
                     // check if the header with the same name already exists
                     if (_req.Headers.Exists(h => h.Name == header.Name))
                     {
-                        RESTLog.RequestError($"{typeof(TReq).Name}: Header with the same name already exists: {header.Name}");
+                        Debug.LogError($"{typeof(TReq).Name}: Header with the same name already exists: {header.Name}");
                         continue;
                     }
 
@@ -347,7 +347,7 @@ namespace Glitch9.IO.RESTApi
                 }
 
                 if (missingFields.Count <= 0) return true;
-                RESTLog.RequestError($"{typeof(TReq).Name}: Missing required properties: {string.Join(", ", missingFields)}");
+                Debug.LogError($"{typeof(TReq).Name}: Missing required properties: {string.Join(", ", missingFields)}");
                 return false;
             }
 
@@ -363,7 +363,7 @@ namespace Glitch9.IO.RESTApi
                     _req.ContentType = contentType;
                     return _req;
                 }
-                RESTLog.RequestError($"{typeof(TReq).Name}: Missing required properties");
+                Debug.LogError($"{typeof(TReq).Name}: Missing required properties");
                 return null;
             }
         }

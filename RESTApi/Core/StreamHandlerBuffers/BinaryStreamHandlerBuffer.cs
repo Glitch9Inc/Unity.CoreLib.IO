@@ -10,13 +10,13 @@ namespace Glitch9.IO.RESTApi
         /// </summary>
         private readonly Action<byte[]> _onDataChunkReceived;
         private readonly Action<float> _onProgressChanged;
-        private readonly bool _logStreamEvents;
+        private readonly RESTClient _client;
 
-        public BinaryStreamHandlerBuffer(Action<byte[]> onDataChunkReceived, Action<float> onProgressChanged = null, bool logStreamEvents = false) : base()
+        public BinaryStreamHandlerBuffer(RESTClient client, Action<byte[]> onDataChunkReceived, Action<float> onProgressChanged = null) : base()
         {
             _onDataChunkReceived = onDataChunkReceived;
             _onProgressChanged = onProgressChanged;
-            _logStreamEvents = logStreamEvents;
+            _client = client;
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Glitch9.IO.RESTApi
         /// </summary>
         protected override void CompleteContent()
         {
-            if (_logStreamEvents) RESTLog.StreamedData("<color=blue>Stream complete!</color>");
+            if (_client.LogStreamEvents) _client.InternalLogger.StreamEvent("<color=blue>Stream complete!</color>");
         }
     }
 }

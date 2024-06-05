@@ -1,5 +1,4 @@
 using Glitch9.IO.Files;
-using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -9,16 +8,16 @@ namespace Glitch9.IO.RESTApi
 {
     internal class UnityWebRequestFactory
     {
-        internal static UnityWebRequest Create<TReq>(TReq req, string method, bool logBody, bool logHeaders, bool logStreamEvents, JsonSerializerSettings jsonSettings = null)
+        internal static UnityWebRequest Create<TReq>(TReq req, string method, RESTClient client)
             where TReq : RESTRequest
         {
             if (req == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
             if (req.WebRequest != null) return req.WebRequest;
 
-            EncodeBody(req, method, logBody, logStreamEvents, jsonSettings);
+            EncodeBody(req, method, client);
             bool includeContentTypeHeader = req.ContentType == ContentType.Json;
 
-            if (logHeaders)
+            if (client.LogRequestHeaders)
             {
                 using (StringBuilderPool.Get(out StringBuilder sb))
                 {
@@ -28,7 +27,7 @@ namespace Glitch9.IO.RESTApi
                         req.WebRequest.SetRequestHeader(header);
                     }
 
-                    RESTLog.RequestHeaders(sb.ToString());
+                    client.InternalLogger.RequestHeaders(sb.ToString());
                 }
             }
             else
@@ -42,7 +41,7 @@ namespace Glitch9.IO.RESTApi
             return req.WebRequest;
         }
 
-        private static void EncodeBody<TReq>(TReq req, string method, bool logBody, bool logStreamEvents, JsonSerializerSettings jsonSettings = null)
+        private static void EncodeBody<TReq>(TReq req, string method, RESTClient client)
             where TReq : RESTRequest
         {
             string url = req.Endpoint;
@@ -52,8 +51,8 @@ namespace Glitch9.IO.RESTApi
             {
                 DownloadHandler downloadHandler = req.StreamMode switch
                 {
-                    StreamMode.TextStream => new TextStreamHandlerBuffer(req.OnStreamEvent, req.OnProgressChanged, logStreamEvents),
-                    StreamMode.BinaryStream => new BinaryStreamHandlerBuffer(req.OnBinaryStream, req.OnProgressChanged, logStreamEvents),
+                    StreamMode.TextStream => new TextStreamHandlerBuffer(client, req.OnStreamEvent, req.OnProgressChanged),
+                    StreamMode.BinaryStream => new BinaryStreamHandlerBuffer(client, req.OnBinaryStream, req.OnProgressChanged),
                     _ => new DownloadHandlerBuffer()
                 };
 
@@ -68,7 +67,7 @@ namespace Glitch9.IO.RESTApi
                 {
                     if (req.HasBody)
                     {
-                        byte[] body = req.ToJson(logBody, jsonSettings);
+                        byte[] body = req.ToJson(client);
                         if (body == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode body of this request.");
                         req.WebRequest.uploadHandler = new UploadHandlerRaw(body);
                     }
@@ -83,7 +82,7 @@ namespace Glitch9.IO.RESTApi
             }
             else if (contentType == ContentType.MultipartForm)
             {
-                List<IMultipartFormSection> formData = req.ToMultipartFormSections(logBody);
+                List<IMultipartFormSection> formData = req.ToMultipartFormSections(client);
                 if (formData == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode form data of this request.");
                 req.WebRequest = UnityWebRequest.Post(url, formData);
             }

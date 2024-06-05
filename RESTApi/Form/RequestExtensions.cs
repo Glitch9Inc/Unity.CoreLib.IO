@@ -11,17 +11,17 @@ namespace Glitch9.IO.RESTApi
 {
     internal static class RequestExtensions
     {
-        internal static byte[] ToJson<TReq>(this TReq req, bool logBody, JsonSerializerSettings settings)
+        internal static byte[] ToJson<TReq>(this TReq req, RESTClient client)
             where TReq : RESTRequest
         {
             if (req == null) return null;
-            string bodyString = JsonConvert.SerializeObject(req, settings);
+            string bodyString = JsonConvert.SerializeObject(req, client.JsonSettings);
             if (string.IsNullOrEmpty(bodyString)) return null;
-            if (logBody) RESTLog.RequestBody(bodyString);
+            if (client.LogRequestBody) client.InternalLogger.RequestBody(bodyString);
             return Encoding.UTF8.GetBytes(bodyString);
         }
 
-        internal static List<IMultipartFormSection> ToMultipartFormSections<TReq>(this TReq req, bool logBody)
+        internal static List<IMultipartFormSection> ToMultipartFormSections<TReq>(this TReq req, RESTClient client)
             where TReq : RESTRequest
         {
             if (req == null) return null;
@@ -45,7 +45,7 @@ namespace Glitch9.IO.RESTApi
                 formData.Add(ValueToFormSection(key, value));
             }
 
-            if (logBody)
+            if (client.LogRequestBody)
             {
                 using (StringBuilderPool.Get(out StringBuilder sb))
                 {
@@ -54,7 +54,7 @@ namespace Glitch9.IO.RESTApi
                     {
                         sb.AppendLine($"{section.sectionName}: {section.sectionData}");
                     }
-                    RESTLog.RequestBody(sb.ToString());
+                    client.InternalLogger.RequestBody(sb.ToString());
                 }
             }
 

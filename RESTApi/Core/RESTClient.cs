@@ -33,6 +33,12 @@ namespace Glitch9.IO.RESTApi
         public JsonSerializerSettings JsonSettings { get; set; }
 
         /// <summary>
+        /// Gets or sets the logger.
+        /// You can set a custom logger to handle logging.
+        /// </summary>
+        public ILogger Logger { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether request headers should be logged.
         /// </summary>
         public virtual bool LogRequestHeaders { get; set; } = Config.DEFAULT_LOG_REQUEST_HEADERS;
@@ -67,14 +73,19 @@ namespace Glitch9.IO.RESTApi
         /// </summary>
         public SSEParser SSEParser { get; set; } = new SSEParser();
 
+        internal RESTLoggerInternal InternalLogger { get; set; }
+
 
         /// <summary>
         /// Constructor to initialize RESTClient with optional JSON settings.
         /// </summary>
         /// <param name="jsonSettings">Custom JSON serializer settings.</param>
-        public RESTClient(JsonSerializerSettings jsonSettings = null)
+        /// <param name="logger">Custom logger.</param>
+        public RESTClient(JsonSerializerSettings jsonSettings = null, ILogger logger = null)
         {
             JsonSettings = jsonSettings ?? JsonUtils.DefaultSettings;
+            Logger = logger ?? new RESTLogger();
+            InternalLogger = new RESTLoggerInternal(Logger);
         }
 
         /// <summary>

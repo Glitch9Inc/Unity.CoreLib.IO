@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
 using Glitch9.IO.Files;
 using System;
-using UnityEngine;
 using UnityEngine.Networking;
 using static Glitch9.IO.RESTApi.RESTClient;
 
@@ -26,15 +25,19 @@ namespace Glitch9.IO.RESTApi
         /// 버전 4.0 업데이트: 2024-05-28 @Munchkin
         /// - 인터넷 연결 체크 함수 이동 (NetworkUtils.cs)
         /// - 더이상 Exception을 catch하지않고 throw만 함
+        ///
+        /// 버전 4.1 업데이트: 2024-06-05 @Munchkin
+        /// - Logger 추가 (RESTLogger.cs)
+        /// 
 
         #endregion
 
         public const int MIN_INTERNAL_OPERATION_MILLIS = 1000;
-        
+
         /// <summary>
         /// Gets the version of the RESTApi library.
         /// </summary>
-        public static Version Version => _version ??= new Version("4.0.0");
+        public static Version Version => _version ??= new Version("4.1.0");
         private static Version _version;
 
         /// <summary>
@@ -54,14 +57,14 @@ namespace Glitch9.IO.RESTApi
             if (request == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
             if (string.IsNullOrEmpty(request.Endpoint)) throw new IssueException(Issue.InvalidEndpoint, "Endpoint is null or empty.");
 
-            if (client.LogRequestInfo) RESTLog.RequestInfo($"Sending {method} request to {request.Endpoint}.");
+            if (client.LogRequestInfo) client.InternalLogger.RequestInfo($"Sending {method} request to {request.Endpoint}.");
             await NetworkUtils.CheckNetworkAsync(Config.NETWORK_CHECK_INTERVAL_IN_MILLIS, Config.NETWORK_CHECK_TIMEOUT_IN_MILLIS);
-            using UnityWebRequest webReq = UnityWebRequestFactory.Create(request, method, client.LogRequestBody, client.LogRequestHeaders, client.LogStreamEvents, client.JsonSettings);
+            using UnityWebRequest webReq = UnityWebRequestFactory.Create(request, method, client);
 
             if (webReq == null) throw new IssueException(Issue.InvalidRequest, "UnityWebRequest is null.");
 
             // Step 2. Sending request =============================================================================================================================
-            await HandleUnityWebRequestResultAsync(webReq, request.RetryDelayInSec, request.MaxRetry);
+            await HandleUnityWebRequestResultAsync(webReq, request.RetryDelayInSec, request.MaxRetry, client);
 
             // Step 3. Detect content type from the response ========================================================================================================
             string contentTypeAsString = webReq.GetResponseHeader("Content-Type");
@@ -72,7 +75,7 @@ namespace Glitch9.IO.RESTApi
             if (isStream)
             {
                 // If it's a stream, everything is handled within the SendAndProcessRequest method
-                if (client.LogStreamEvents) RESTLog.RequestInfo("Stream has ended.");
+                if (client.LogStreamEvents) client.InternalLogger.RequestInfo("Stream has ended.");
                 return RESTObject.Done(); // Let the caller know that the stream has ended
             }
 
@@ -80,36 +83,36 @@ namespace Glitch9.IO.RESTApi
             if (string.IsNullOrEmpty(webReq.downloadHandler.text)) throw new IssueException(Issue.EmptyResponse, "DownloadHandler text is null or empty.");
 
             // Step 5. Handling response ============================================================================================================================
-            if (client.LogRequestInfo) RESTLog.RequestInfo($"Received response from {request.Endpoint}");
+            if (client.LogRequestInfo) client.InternalLogger.RequestInfo($"Received response from {request.Endpoint}");
 
             DataTransferMode returnTransferMode = DataTransferMode.Text;
             if (request.DownloadPath != null) returnTransferMode = request.DownloadPath.Type.ToDataTransferMode();
 
             if (returnTransferMode == DataTransferMode.Text)
             {
-                if (client.LogRequestDetails) RESTLog.RequestDetails("Download Mode: Text");
+                if (client.LogRequestDetails) client.InternalLogger.RequestDetails("Download Mode: Text");
                 string textResult = webReq.downloadHandler.text;
 
                 if (string.IsNullOrEmpty(textResult)) throw new IssueException(Issue.EmptyResponse, "Text result is null or empty.");
-                if (client.LogResponseBody) RESTLog.ResponseBody(textResult);
+                if (client.LogResponseBody) client.InternalLogger.ResponseBody(textResult);
 
-                return await TextResponseConverter.ConvertAsync<TRes>(textResult, request.DownloadPath, client.JsonSettings);
+                return await TextResponseConverter.ConvertAsync<TRes>(textResult, request.DownloadPath, client);
             }
 
             if (returnTransferMode == DataTransferMode.Binary)
             {
-                if (client.LogRequestDetails) RESTLog.RequestDetails("Download Mode: Binary");
+                if (client.LogRequestDetails) client.InternalLogger.RequestDetails("Download Mode: Binary");
                 byte[] binaryResult = webReq.downloadHandler.data;
 
                 if (binaryResult.IsNullOrEmpty()) throw new IssueException(Issue.EmptyResponse, "Binary result is null or empty.");
 
-                return await BinaryResponseConverter.ConvertAsync<TRes>(binaryResult, request.DownloadPath);
+                return await BinaryResponseConverter.ConvertAsync<TRes>(binaryResult, request.DownloadPath, client);
             }
 
             throw new IssueException(Issue.UnknownError);
         }
 
-        public static async UniTask HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries)
+        public static async UniTask HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries, RESTClient client)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
@@ -127,7 +130,7 @@ namespace Glitch9.IO.RESTApi
                     return;
                 }
 
-                LogRequestError(request);
+                LogRequestError(request, client);
                 if (attempt == maxRetries - 1) break;
 
                 await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));
@@ -137,21 +140,21 @@ namespace Glitch9.IO.RESTApi
             throw new TimeoutException("UnityWebRequest did not complete successfully within the specified number of retries.");
         }
 
-        private static void LogRequestError(UnityWebRequest request)
+        private static void LogRequestError(UnityWebRequest request, RESTClient client)
         {
             switch (request.result)
             {
                 case UnityWebRequest.Result.ConnectionError:
-                    Debug.LogWarning("Connection error detected.");
+                    client.Logger.Warning("Connection error detected.");
                     break;
                 case UnityWebRequest.Result.DataProcessingError:
-                    Debug.LogWarning("Data processing error detected.");
+                    client.Logger.Warning("Data processing error detected.");
                     break;
                 case UnityWebRequest.Result.ProtocolError:
-                    Debug.LogWarning("HTTP error detected: " + request.responseCode);
+                    client.Logger.Warning("HTTP error detected: " + request.responseCode);
                     break;
                 default:
-                    Debug.LogWarning("Unknown error occurred.");
+                    client.Logger.Warning("Unknown error occurred.");
                     break;
             }
         }
