@@ -22,7 +22,7 @@ namespace Glitch9.IO.RESTApi
         {
             IsArray = isArray;
         }
-  
+
         public StringOr(string stringValue)
         {
             Value = stringValue;
@@ -42,7 +42,7 @@ namespace Glitch9.IO.RESTApi
         }
 
         public bool HasValue => Value != null;
-        public bool IsString => typeof(T) == typeof(string);
+        public bool IsString => Value is string;
         public bool IsObject => typeof(T) != typeof(string) && !IsArray;
         public bool IsArray { get; private set; }
 
@@ -62,7 +62,7 @@ namespace Glitch9.IO.RESTApi
         {
             if (IsString) return Value as string;
             if (IsArray) return string.Join(", ", ((Value as T[]) ?? Array.Empty<T>()).Select(x => x.ToString()));
-            
+
             return base.ToString();
         }
 
@@ -93,12 +93,12 @@ namespace Glitch9.IO.RESTApi
     {
         public override void WriteJson(JsonWriter writer, StringOr<T> value, JsonSerializer serializer)
         {
-            var settings = new JsonSerializerSettings
+            JsonSerializerSettings settings = new()
             {
                 ReferenceLoopHandling = ReferenceLoopHandling.Ignore
             };
 
-            var localSerializer = JsonSerializer.Create(settings);
+            JsonSerializer localSerializer = JsonSerializer.Create(settings);
 
             // Handle the serialization of the StringOr
             if (value.IsString)
@@ -126,20 +126,22 @@ namespace Glitch9.IO.RESTApi
             {
                 return new StringOr<T>(token.ToObject<string>());
             }
-            else if (token.Type == JTokenType.Object)
+
+            if (token.Type == JTokenType.Object)
             {
+                Debug.Log("StringOr is an object");
                 T obj = token.ToObject<T>();
                 return new StringOr<T>(obj);
             }
-            else if (token.Type == JTokenType.Array)
+
+            if (token.Type == JTokenType.Array)
             {
+                Debug.Log("StringOr is an array");
                 T[] array = token.ToObject<T[]>();
                 return new StringOr<T>(array);
             }
-            else
-            {
-                throw new JsonSerializationException("Unexpected token type when parsing StringOr.");
-            }
+
+            throw new JsonSerializationException("Unexpected token type when parsing StringOr.");
         }
     }
 }
