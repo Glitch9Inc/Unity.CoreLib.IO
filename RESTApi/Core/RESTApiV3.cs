@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using Glitch9.IO.Files;
 using System;
+using Glitch9.IO.Network;
 using UnityEngine.Networking;
 using static Glitch9.IO.RESTApi.RESTClient;
 

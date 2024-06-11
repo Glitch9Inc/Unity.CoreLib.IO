@@ -129,14 +129,14 @@ namespace Glitch9.IO.RESTApi
 
             if (token.Type == JTokenType.Object)
             {
-                Debug.Log("StringOr is an object");
+                //Debug.Log("StringOr is an object");
                 T obj = token.ToObject<T>();
                 return new StringOr<T>(obj);
             }
 
             if (token.Type == JTokenType.Array)
             {
-                Debug.Log("StringOr is an array");
+                //Debug.Log("StringOr is an array");
                 T[] array = token.ToObject<T[]>();
                 return new StringOr<T>(array);
             }

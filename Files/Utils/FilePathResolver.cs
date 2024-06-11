@@ -69,6 +69,14 @@ namespace Glitch9.IO.Files
             return checkIfFileExists ? CheckIfFileExists(fullPath) : fullPath;
         }
 
+        public static string ResolveFilePath(string filePath)
+        {
+            // fix slashes
+            filePath = filePath.Replace('\\', '/');
+            if (filePath.Contains("Assets/Assets")) filePath = filePath.Replace("Assets/Assets", "Assets");
+            return filePath;
+        }
+
         /// <summary>
         /// Resolves the streaming assets path.
         /// </summary>

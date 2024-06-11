@@ -1,6 +1,6 @@
 using System;
 
-namespace Glitch9.IO
+namespace Glitch9.IO.Network
 {
     public class ObjectCheck<TObject> where TObject : class, new()
     {

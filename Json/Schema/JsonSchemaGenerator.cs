@@ -93,7 +93,7 @@ namespace Glitch9.IO.Json.Schema
                     if (property.CanRead && property.CanWrite)
                     {
                         string propertyName = property.Name;
-                        JsonSchemaAttribute attribute = CachedAttribute<JsonSchemaAttribute>.Get(property);
+                        JsonSchemaAttribute attribute = AttributeCache<JsonSchemaAttribute>.Get(property);
                         if (attribute != null)
                         {
                             if (!string.IsNullOrEmpty(attribute.PropertyName)) propertyName = attribute.PropertyName;
@@ -106,7 +106,7 @@ namespace Glitch9.IO.Json.Schema
             }
 
             // Add JsonContainerAttribute metadata if present
-            JsonSchemaAttribute schemaAttribute = CachedAttribute<JsonSchemaAttribute>.Get(type);
+            JsonSchemaAttribute schemaAttribute = AttributeCache<JsonSchemaAttribute>.Get(type);
             if (schemaAttribute != null)
             {
                 CurrentSchema.Description = schemaAttribute.Description;

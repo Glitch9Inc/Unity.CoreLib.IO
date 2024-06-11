@@ -33,11 +33,11 @@ namespace Glitch9.IO.RESTApi
             // rename the property if it has a [JsonProperty] attribute
             // add each property to the form data
 
-            List<PropertyInfo> properties = CachedPropertyInfo.Get<TReq>();
+            List<PropertyInfo> properties = PropertyInfoCache.Get<TReq>();
 
             foreach (PropertyInfo prop in properties)
             {
-                JsonPropertyAttribute jsonProp = CachedAttribute<JsonPropertyAttribute>.Get(prop);
+                JsonPropertyAttribute jsonProp = AttributeCache<JsonPropertyAttribute>.Get(prop);
                 if (jsonProp == null) continue;
                 string key = jsonProp.PropertyName;
                 object value = prop.GetValue(req);

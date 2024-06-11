@@ -1,8 +1,8 @@
-using Cysharp.Threading.Tasks;
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-namespace Glitch9.IO
+namespace Glitch9.IO.Network
 {
     public static class NetworkUtils
     {

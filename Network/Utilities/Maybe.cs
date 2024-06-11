@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Glitch9
+namespace Glitch9.IO.Network
 {
     /// <summary>
     /// Ensures a value is assigned only once. This prevents redundant reassignment attempts 

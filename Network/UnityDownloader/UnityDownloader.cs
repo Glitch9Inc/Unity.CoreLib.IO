@@ -1,16 +1,16 @@
-using Cysharp.Threading.Tasks;
-using Glitch9.IO.Files;
 using System;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
+using Glitch9.IO.Files;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace Glitch9.IO
+namespace Glitch9.IO.Network
 {
-    public class UnityFileDownloader
+    public class UnityDownloader
     {
         private const int MAX_DL_FAIL_COUNT = 3;
 

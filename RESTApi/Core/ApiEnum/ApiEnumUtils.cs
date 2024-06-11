@@ -11,7 +11,7 @@ namespace Glitch9.IO.RESTApi
             FieldInfo field = value.GetType().GetField(value.ToString());
             try
             {
-                ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(field);
                 if (attribute != null)
                 {
                     return attribute.ApiName;
@@ -30,7 +30,7 @@ namespace Glitch9.IO.RESTApi
         {
             foreach (FieldInfo field in typeof(TEnum).GetFields())
             {
-                ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(field);
 
                 if (attribute != null)
                 {
@@ -41,8 +41,49 @@ namespace Glitch9.IO.RESTApi
                 }
             }
 
-            //throw new ArgumentException($"'{apiName}' is not a valid value for {typeof(TEnum).Name}.");
-            return default;    // return default value instead
+            // parse normally
+            return (TEnum)Enum.Parse(typeof(TEnum), apiName);
+        }
+
+        public static bool TryParse<TEnum>(string apiName, out TEnum result, bool ignoreCase = false)
+            where TEnum : struct, Enum
+        {
+            foreach (FieldInfo field in typeof(TEnum).GetFields())
+            {
+                ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(field);
+
+                if (attribute != null)
+                {
+                    if (string.Equals(attribute.ApiName, apiName, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                    {
+                        result = (TEnum)field.GetValue(null);
+                        return true;
+                    }
+                }
+            }
+
+            // parse normally
+            return Enum.TryParse(apiName, ignoreCase, out result);
+        }
+
+        public static bool TryParse(Type enumType, string apiName, out object result, bool ignoreCase = false)
+        {
+            foreach (FieldInfo field in enumType.GetFields())
+            {
+                ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(field);
+
+                if (attribute != null)
+                {
+                    if (string.Equals(attribute.ApiName, apiName, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                    {
+                        result = field.GetValue(null);
+                        return true;
+                    }
+                }
+            }
+
+            // parse normally
+            return Enum.TryParse(enumType, apiName, ignoreCase, out result);
         }
     }
 }

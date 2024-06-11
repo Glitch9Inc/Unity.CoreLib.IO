@@ -21,7 +21,7 @@ namespace Glitch9.IO.RESTApi
                 if (field == null)
                     continue;
 
-                ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(field);
                 if (attribute != null && value.Equals(attribute.ApiName, StringComparison.OrdinalIgnoreCase))
                 {
                     return (TEnum)Enum.Parse(enumType, name);
@@ -57,7 +57,7 @@ namespace Glitch9.IO.RESTApi
                 if (field == null)
                     continue;
 
-                var attribute = CachedAttribute<ApiEnumAttribute>.Get(field);
+                var attribute = AttributeCache<ApiEnumAttribute>.Get(field);
                 if (attribute != null && value.Equals(attribute.ApiName, StringComparison.OrdinalIgnoreCase))
                 {
                     return Enum.Parse(enumType, name);
@@ -80,7 +80,7 @@ namespace Glitch9.IO.RESTApi
             string name = enumType.GetEnumName(value);
             if (string.IsNullOrEmpty(name)) throw new JsonSerializationException("Invalid enum value");
 
-            ApiEnumAttribute attribute = CachedAttribute<ApiEnumAttribute>.Get(enumType.GetField(name));
+            ApiEnumAttribute attribute = AttributeCache<ApiEnumAttribute>.Get(enumType.GetField(name));
 
             string outputValue = attribute != null ? attribute.ApiName : name;
             writer.WriteValue(outputValue);
