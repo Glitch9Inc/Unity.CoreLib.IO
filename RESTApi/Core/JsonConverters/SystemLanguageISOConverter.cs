@@ -4,6 +4,9 @@ using UnityEngine;
 
 namespace Glitch9.IO.RESTApi
 {
+    /// <summary>
+    /// Custom <see cref="JsonConverter"/> for converting <see cref="SystemLanguage"/> to and from its ISO code.
+    /// </summary>
     public class SystemLanguageISOConverter : JsonConverter<SystemLanguage>
     {
         public override void WriteJson(JsonWriter writer, SystemLanguage value, JsonSerializer serializer)

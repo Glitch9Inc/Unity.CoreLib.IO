@@ -10,7 +10,7 @@ namespace Glitch9.IO.RESTApi
     /// <summary>
     /// This object can be either a string, T, or an array of T.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">The type of the object that can be stored in the StringOr.</typeparam>
     public class StringOr<T>
     {
         public static implicit operator StringOr<T>(string stringValue) => new(stringValue);
@@ -60,20 +60,13 @@ namespace Glitch9.IO.RESTApi
 
         public override string ToString()
         {
-            if (IsString) return Value as string;
-            if (IsArray) return string.Join(", ", ((Value as T[]) ?? Array.Empty<T>()).Select(x => x.ToString()));
-
+            if (Value is string s) return s;
+            if (Value is T[] array) return array.Length > 0 ? array[0].ToString() : string.Empty;
             return base.ToString();
         }
 
         public T[] ToArray()
         {
-            //if (!IsArray)
-            //{
-            //    Debug.LogError("Cannot convert a non-array StringOr to an array.");
-            //    return null;
-            //}
-
             return Value as T[];
         }
 

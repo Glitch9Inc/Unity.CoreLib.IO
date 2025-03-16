@@ -6,7 +6,7 @@ namespace Glitch9.IO.RESTApi
 {
     public static class ApiEnumUtils
     {
-        public static string ToApiName(this Enum value)
+        public static string GetApiName(this Enum value)
         {
             FieldInfo field = value.GetType().GetField(value.ToString());
             try

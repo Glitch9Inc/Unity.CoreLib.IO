@@ -37,14 +37,14 @@ namespace Glitch9.IO.Files
         public static async UniTask<Texture2D> LoadTexture(UnityFilePath filePath)
         {
             if (filePath == null) return null;
-            return await LoadTexture(filePath.Path, filePath.UnityPath);
+            return await LoadTexture(filePath.Path, filePath.PathType);
         }
 
-        public static async UniTask<Texture2D> LoadTexture(string filePath, UnityPath path = UnityPath.Assets)
+        public static async UniTask<Texture2D> LoadTexture(string filePath, PathType pathType = PathType.DataPath)
         {
             if (string.IsNullOrEmpty(filePath)) return null;
 
-            if (path == UnityPath.Resources)
+            if (pathType == PathType.Resources)
             {
                 ResourceRequest request = Resources.LoadAsync<Texture2D>(filePath);
                 await request.ToUniTask();
@@ -52,12 +52,12 @@ namespace Glitch9.IO.Files
                 return null; // 혹은 오류 처리
             }
 
-            if (path == UnityPath.URL)
+            if (pathType == PathType.WebUrl)
             {
                 return await LoadTextureFromUrl(filePath);
             }
 
-            filePath = FilePathResolver.ResolveUnityWebRequestLocalPath(path, filePath);
+            filePath = PathResolver.ResolveUnityWebRequestPath(pathType, filePath);
 
             try
             {
@@ -70,14 +70,14 @@ namespace Glitch9.IO.Files
             }
         }
 
-        public static byte[] ToBytes(this Texture2D texture)
+        public static byte[] ToByteArray(this Texture2D texture)
         {
             return texture.EncodeToPNG();
         }
 
         private static async UniTask<Texture2D> LoadTextureFromLocal(string filePath)
         {
-            if (!await FilePathResolver.DelayedExists(filePath)) return null;
+            if (!await PathResolver.DelayedExists(filePath)) return null;
             byte[] fileData = await File.ReadAllBytesAsync(filePath);
             Texture2D texture = new(2, 2);
             texture.LoadImage(fileData);

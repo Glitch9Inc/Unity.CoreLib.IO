@@ -1,6 +1,6 @@
-using System;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using System;
 using UnityEngine;
 
 namespace Glitch9.IO.Files
@@ -8,22 +8,22 @@ namespace Glitch9.IO.Files
     [Serializable]
     public abstract class UnityFileBase<T>
     {
-        private const int FILE_CHECK_INITIAL_DELAY_IN_MILLIS = 3000;
+        private const int FILE_CHECK_INITIAL_DELAY_IN_MILLIS = 1200;
         private const int FILE_CHECK_RETRY_INTERVAL_IN_MILLIS = 1000;
+        private const int DELAY_AFTER_LOADING_IN_MILLIS = 500;
         private const int FILE_CHECK_COUNT = 3;
 
         // Event handlers
-        public event Action OnLoading;
-        public event Action<T> OnLoaded;
-        public event Action<string> OnError;
-        
+        public event Action onLoading;
+        public event Action<T> onLoaded;
+        //public event Action<string> onError;
+
         [SerializeField] private UnityFilePath path;
         [SerializeField] private string text;
-        
+
         [JsonIgnore] private T _value;
-        [JsonIgnore] private OneShotLog _oneShotLog;
-        
-        [JsonIgnore]  
+
+        [JsonIgnore]
         public UnityFilePath Path
         {
             get => path ?? new();
@@ -59,14 +59,30 @@ namespace Glitch9.IO.Files
 
         [JsonIgnore] public bool IsError { get; private set; } = false;
 
-        [JsonIgnore] public string LastError => _oneShotLog?.ToString();
+        [JsonIgnore] public string LastError { get; private set; }
 
-        
+
+
+        protected UnityFileBase() { }
+        protected UnityFileBase(UnityFilePath path) => Path = path;
+
+        protected UnityFileBase(string filePath)
+        {
+            if (filePath.StartsWith("Assets/"))
+                Path = new UnityFilePath(PathType.DataPath, filePath);
+            else if (filePath.StartsWith("Resources/"))
+                Path = new UnityFilePath(PathType.Resources, filePath);
+            else if (filePath.StartsWith("http://") || filePath.StartsWith("https://"))
+                Path = new UnityFilePath(PathType.WebUrl, filePath);
+            else
+                Path = new UnityFilePath(PathType.Local, filePath);
+        }
+
         public async UniTask<T> GetValue(bool forceRefresh = false)
         {
             return await GetValue(-1, forceRefresh);
         }
-        
+
         public async UniTask<T> GetValue(float customInitialDelay, bool forceRefresh = false)
         {
             if (IsLoaded && !forceRefresh)
@@ -77,9 +93,8 @@ namespace Glitch9.IO.Files
 
             if (IsError)
             {
-                _oneShotLog ??= new();
-                _oneShotLog.Error($"Error loading file. Path:{Path?.Path}");
-                OnError?.Invoke(LastError);
+                LastError = $"Error loading file. Path:{Path?.Path}";
+                Debug.LogError(LastError);
                 return _value;
             }
 
@@ -89,14 +104,20 @@ namespace Glitch9.IO.Files
         private async UniTask<T> GetAsync(float customInitialDelay)
         {
             IsLoading = true;
-            OnLoading?.Invoke();
+            onLoading?.Invoke();
 
             IsError = false;
             IsLoaded = false;
 
             if (Path == null)
             {
-                HandleError("UnityFile was not loaded because the UnityFilePath was null.");
+                LastError = "UnityFile was not loaded because the UnityFilePath was null.";
+                Debug.LogError(LastError);
+            }
+            else if (!Path.IsValid)
+            {
+                LastError = "UnityFile was not loaded because the UnityFilePath was invalid (null or whitespace).";
+                //Debug.LogError(LastError);
             }
             else
             {
@@ -115,27 +136,26 @@ namespace Glitch9.IO.Files
                 {
                     _value = await LoadFileAsync();
                     IsLoaded = true;
-                    OnLoaded?.Invoke(_value);
+                    onLoaded?.Invoke(_value);
                 }
                 catch (Exception e)
                 {
-                    HandleError(e.Message);
+                    LastError = e.Message;
+                    Debug.LogError(e);
                 }
             }
 
-            IsLoading = false;
+            StopLoading().Forget();
             return _value;
         }
 
-        private void HandleError(string message)
+        private async UniTask StopLoading()
         {
-            IsError = true;
-            _oneShotLog ??= new();
-            _oneShotLog.Error($"Failed to load file from {Path?.Path}. Error: {message}");
-            OnError?.Invoke(LastError);
+            await UniTask.Delay(DELAY_AFTER_LOADING_IN_MILLIS);
+            IsLoading = false;
         }
-      
+
         protected abstract UniTask<T> LoadFileAsync();
-        protected abstract byte[] ToBytes();
+        public abstract byte[] ToByteArray();
     }
 }

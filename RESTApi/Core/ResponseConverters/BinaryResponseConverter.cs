@@ -8,30 +8,30 @@ namespace Glitch9.IO.RESTApi
         internal static async UniTask<TRes> ConvertAsync<TRes>(
             byte[] result,
             UnityFilePath downloadPath,
-            RESTClient client) where TRes : RESTObject, new()
+            RESTClient client) where TRes : RESTResponse, new()
         {
-            Validate.Argument.NotNull(downloadPath);
+            ThrowIf.ArgumentIsNull(downloadPath);
 
             // Result cannot be null at this point. No need to check for null
-            TRes response = new() { BinaryResult = result };
+            TRes response = new() { BinaryOutput = result };
 
             // Converting the byte array to the appropriate type
             switch (downloadPath.Type)
             {
-                case ContentType.Png or ContentType.Jpeg:
-                    response.ImageResult = ImageConverter.BinaryToTexture2D(result);
+                case ContentType.PNG or ContentType.JPEG:
+                    response.ImageOutput = ImageConverter.BinaryToTexture2D(result);
                     break;
-                case ContentType.Gif:
+                case ContentType.GIF:
                     client.InternalLogger.ResponseError("GIF is not supported. Texture2D will not be created.");
                     break;
-                case ContentType.Mpeg:
-                    response.AudioResult = await AudioConverter.MPEGToAudioClip(result, downloadPath.GetLocalPath());
+                case ContentType.MPEG:
+                    response.AudioOutput = await AudioConverter.MPEGToAudioClip(result, downloadPath.ResolveFilePath());
                     break;
-                case ContentType.Wav:
-                    response.AudioResult = await AudioConverter.WAVToAudioClip(result, downloadPath.GetLocalPath());
+                case ContentType.WAV:
+                    response.AudioOutput = await AudioConverter.WAVToAudioClip(result, downloadPath.ResolveFilePath());
                     break;
                 default:
-                    response.FileResult = await BinaryConverter.ToBinaryFile(result, downloadPath.GetLocalPath());
+                    response.FileOutput = await BinaryUtils.ToBinaryFile(result, downloadPath.ResolveFilePath());
                     break;
             }
 

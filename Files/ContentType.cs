@@ -40,12 +40,12 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Represents HTML formatted text (.html).
         /// </summary>
-        Html,
+        HTML,
 
         /// <summary>
         /// Represents comma-separated values (.csv).
         /// </summary>
-        Csv,
+        CSV,
 
         /// <summary>
         /// Represents explicitly formatted XML text (.xml).
@@ -60,17 +60,17 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Represents Adobe Portable Document Format (.pdf).
         /// </summary>
-        Pdf,
+        PDF,
 
         /// <summary>
         /// Represents MPEG video format (.mpeg).
         /// </summary>
-        Mpeg,
+        MPEG,
 
         /// <summary>
         /// Represents Waveform Audio File Format (.wav).
         /// </summary>
-        Wav,
+        WAV,
 
         /// <summary>
         /// Represents Base64 encoded image data.
@@ -80,32 +80,32 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Represents JPEG image format (.jpeg).
         /// </summary>
-        Jpeg,
+        JPEG,
 
         /// <summary>
         /// Represents JPEG image format (.jpg).
         /// </summary>
-        Jpg,
+        JPG,
 
         /// <summary>
         /// Represents Portable Network Graphics format (.png).
         /// </summary>
-        Png,
+        PNG,
 
         /// <summary>
         /// Represents Graphics Interchange Format (.gif).
         /// </summary>
-        Gif,
+        GIF,
 
         /// <summary>
         /// Represents MPEG-4 video format (.mp4).
         /// </summary>
-        Mp4,
+        MP4,
 
         /// <summary>
         /// Represents Audio Video Interleave format (.avi).
         /// </summary>
-        Avi,
+        AVI,
 
         /// <summary>
         /// Represents C source code (.c).
@@ -205,7 +205,7 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Represents a ZIP archive file, used for compression and archiving (.zip).
         /// </summary>
-        Zip,
+        ZIP,
     }
 
     public static class ContentTypeUtils
@@ -220,20 +220,20 @@ namespace Glitch9.IO.Files
                 ContentType.WWWForm => DataTransferMode.Text,
                 ContentType.MultipartForm => DataTransferMode.Text,
                 ContentType.PlainText => DataTransferMode.Text,
-                ContentType.Html => DataTransferMode.Text,
-                ContentType.Csv => DataTransferMode.Text,
+                ContentType.HTML => DataTransferMode.Text,
+                ContentType.CSV => DataTransferMode.Text,
                 ContentType.XmlText => DataTransferMode.Text,
                 ContentType.OctetStream => DataTransferMode.Binary,
-                ContentType.Pdf => DataTransferMode.Binary,
-                ContentType.Mpeg => DataTransferMode.Binary,
-                ContentType.Wav => DataTransferMode.Binary,
+                ContentType.PDF => DataTransferMode.Binary,
+                ContentType.MPEG => DataTransferMode.Binary,
+                ContentType.WAV => DataTransferMode.Binary,
                 ContentType.Base64Image => DataTransferMode.Binary,
-                ContentType.Jpeg => DataTransferMode.Binary,
-                ContentType.Jpg => DataTransferMode.Binary,
-                ContentType.Png => DataTransferMode.Binary,
-                ContentType.Gif => DataTransferMode.Binary,
-                ContentType.Mp4 => DataTransferMode.Binary,
-                ContentType.Avi => DataTransferMode.Binary,
+                ContentType.JPEG => DataTransferMode.Binary,
+                ContentType.JPG => DataTransferMode.Binary,
+                ContentType.PNG => DataTransferMode.Binary,
+                ContentType.GIF => DataTransferMode.Binary,
+                ContentType.MP4 => DataTransferMode.Binary,
+                ContentType.AVI => DataTransferMode.Binary,
                 ContentType.C => DataTransferMode.Text,
                 ContentType.CSharp => DataTransferMode.Text,
                 ContentType.CPP => DataTransferMode.Text,
@@ -253,7 +253,7 @@ namespace Glitch9.IO.Files
                 ContentType.ShellScript => DataTransferMode.Text,
                 ContentType.TypeScript => DataTransferMode.Text,
                 ContentType.TapeArchive => DataTransferMode.Binary,
-                ContentType.Zip => DataTransferMode.Binary,
+                ContentType.ZIP => DataTransferMode.Binary,
                 _ => DataTransferMode.Text,
             };
         }
@@ -276,8 +276,8 @@ namespace Glitch9.IO.Files
 
                 // Text-Based Types (For API interactions, logging, configurations, etc.)
                 ContentType.PlainText => "Text/plain",
-                ContentType.Html => "Text/html",
-                ContentType.Csv => "Text/csv",
+                ContentType.HTML => "Text/html",
+                ContentType.CSV => "Text/csv",
                 ContentType.C => "text/x-c",
                 ContentType.CSharp => "text/x-csharp",
                 ContentType.CPP => "text/x-c++",
@@ -299,18 +299,18 @@ namespace Glitch9.IO.Files
 
                 // Binary Types (For transmitting files, multimedia content, etc.)
                 ContentType.OctetStream => "application/octet-stream",
-                ContentType.Pdf => "application/pdf",
-                ContentType.Mpeg => "audio/mpeg",
-                ContentType.Wav => "audio/wav",
-                ContentType.Jpeg => "image/jpeg",
-                ContentType.Png => "image/png",
-                ContentType.Gif => "image/gif",
-                ContentType.Mp4 => "video/mp4",
-                ContentType.Avi => "video/x-msvideo",
+                ContentType.PDF => "application/pdf",
+                ContentType.MPEG => "audio/mpeg",
+                ContentType.WAV => "audio/wav",
+                ContentType.JPEG => "image/jpeg",
+                ContentType.PNG => "image/png",
+                ContentType.GIF => "image/gif",
+                ContentType.MP4 => "video/mp4",
+                ContentType.AVI => "video/x-msvideo",
 
                 // Archive Types (For compressed files and collections of files)
                 ContentType.TapeArchive => "application/x-tar",
-                ContentType.Zip => "application/zip",
+                ContentType.ZIP => "application/zip",
 
                 _ => "application/json"
             };
@@ -332,8 +332,8 @@ namespace Glitch9.IO.Files
                 "application/x-www-form-urlencoded" => ContentType.WWWForm,
                 "multipart/form-data" => ContentType.MultipartForm,
                 "text/plain" => ContentType.PlainText,
-                "text/html" => ContentType.Html,
-                "text/csv" => ContentType.Csv,
+                "text/html" => ContentType.HTML,
+                "text/csv" => ContentType.CSV,
                 "text/x-c" => ContentType.C,
                 "text/x-csharp" => ContentType.CSharp,
                 "text/x-c++" => ContentType.CPP,
@@ -353,16 +353,16 @@ namespace Glitch9.IO.Files
                 "application/x-sh" => ContentType.ShellScript,
                 "application/typescript" => ContentType.TypeScript,
                 "application/octet-stream" => ContentType.OctetStream,
-                "application/pdf" => ContentType.Pdf,
-                "audio/mpeg" => ContentType.Mpeg,
-                "audio/wav" => ContentType.Wav,
-                "image/jpeg" => ContentType.Jpeg,
-                "image/png" => ContentType.Png,
-                "image/gif" => ContentType.Gif,
-                "video/mp4" => ContentType.Mp4,
-                "video/x-msvideo" => ContentType.Avi,
+                "application/pdf" => ContentType.PDF,
+                "audio/mpeg" => ContentType.MPEG,
+                "audio/wav" => ContentType.WAV,
+                "image/jpeg" => ContentType.JPEG,
+                "image/png" => ContentType.PNG,
+                "image/gif" => ContentType.GIF,
+                "video/mp4" => ContentType.MP4,
+                "video/x-msvideo" => ContentType.AVI,
                 "application/x-tar" => ContentType.TapeArchive,
-                "application/zip" => ContentType.Zip,
+                "application/zip" => ContentType.ZIP,
                 _ => ContentType.Json
             };
         }
@@ -379,8 +379,8 @@ namespace Glitch9.IO.Files
                 ".jsonl" => ContentType.Jsonl,
                 ".xml" => ContentType.Xml,
                 ".txt" => ContentType.PlainText,
-                ".html" => ContentType.Html,
-                ".csv" => ContentType.Csv,
+                ".html" => ContentType.HTML,
+                ".csv" => ContentType.CSV,
                 ".c" => ContentType.C,
                 ".cs" => ContentType.CSharp,
                 ".cpp" => ContentType.CPP,
@@ -401,17 +401,17 @@ namespace Glitch9.IO.Files
                 ".sh" => ContentType.ShellScript,
                 ".ts" => ContentType.TypeScript,
                 ".bin" => ContentType.OctetStream,
-                ".pdf" => ContentType.Pdf,
-                ".mp3" => ContentType.Mpeg,
-                ".wav" => ContentType.Wav,
-                ".jpeg" => ContentType.Jpeg,
-                ".jpg" => ContentType.Jpeg,
-                ".png" => ContentType.Png,
-                ".gif" => ContentType.Gif,
-                ".mp4" => ContentType.Mp4,
-                ".avi" => ContentType.Avi,
+                ".pdf" => ContentType.PDF,
+                ".mp3" => ContentType.MPEG,
+                ".wav" => ContentType.WAV,
+                ".jpeg" => ContentType.JPEG,
+                ".jpg" => ContentType.JPEG,
+                ".png" => ContentType.PNG,
+                ".gif" => ContentType.GIF,
+                ".mp4" => ContentType.MP4,
+                ".avi" => ContentType.AVI,
                 ".tar" => ContentType.TapeArchive,
-                ".zip" => ContentType.Zip,
+                ".zip" => ContentType.ZIP,
                 _ => ContentType.Unknown
             };
         }
@@ -427,8 +427,8 @@ namespace Glitch9.IO.Files
                 ContentType.WWWForm => ".form",
                 ContentType.MultipartForm => ".form",
                 ContentType.PlainText => ".txt",
-                ContentType.Html => ".html",
-                ContentType.Csv => ".csv",
+                ContentType.HTML => ".html",
+                ContentType.CSV => ".csv",
                 ContentType.C => ".c",
                 ContentType.CSharp => ".cs",
                 ContentType.CPP => ".cpp",
@@ -447,16 +447,16 @@ namespace Glitch9.IO.Files
                 ContentType.ShellScript => ".sh",
                 ContentType.TypeScript => ".ts",
                 ContentType.OctetStream => ".bin",
-                ContentType.Pdf => ".pdf",
-                ContentType.Mpeg => ".mp3",
-                ContentType.Wav => ".wav",
-                ContentType.Jpeg => ".jpeg",
-                ContentType.Png => ".png",
-                ContentType.Gif => ".gif",
-                ContentType.Mp4 => ".mp4",
-                ContentType.Avi => ".avi",
+                ContentType.PDF => ".pdf",
+                ContentType.MPEG => ".mp3",
+                ContentType.WAV => ".wav",
+                ContentType.JPEG => ".jpeg",
+                ContentType.PNG => ".png",
+                ContentType.GIF => ".gif",
+                ContentType.MP4 => ".mp4",
+                ContentType.AVI => ".avi",
                 ContentType.TapeArchive => ".tar",
-                ContentType.Zip => ".zip",
+                ContentType.ZIP => ".zip",
                 _ => ".unknown",
             };
         }

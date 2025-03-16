@@ -27,6 +27,10 @@ namespace Glitch9.IO.RESTApi
         - Dynamic Object Mapping: SSE data often takes the form of JSON. This allows for the dynamic serialization of incoming data into objects corresponding to the JSON structure.
     */
 
+    /// <summary>
+    /// Indicates the mode of the stream for <see cref="RESTApiV3"/>.
+    /// Text stream, binary stream or no stream.
+    /// </summary>
     public enum StreamMode
     {
         NoStream,

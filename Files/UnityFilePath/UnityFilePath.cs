@@ -12,7 +12,7 @@ namespace Glitch9.IO.Files
     public class UnityFilePath
     {
         [SerializeField] private string id;
-        [FormerlySerializedAs("type")][SerializeField] private UnityPath unityPath;
+        [FormerlySerializedAs("unityPath")] [FormerlySerializedAs("type")][SerializeField] private PathType pathType;
         [FormerlySerializedAs("uri")][SerializeField] private string path;
         [SerializeField] private ContentType type;
 
@@ -24,7 +24,15 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Gets the Unity path type.
         /// </summary>
-        [JsonIgnore] public UnityPath UnityPath => unityPath;
+        [JsonIgnore]
+        public PathType PathType
+        {
+            get
+            {
+                if (pathType == PathType.Unknown) pathType = PathResolver.ResolvePathType(path);
+                return pathType;
+            }
+        }
 
         /// <summary>
         /// Gets the file path.
@@ -53,6 +61,8 @@ namespace Glitch9.IO.Files
 
         private string _fileName;
 
+        [JsonIgnore] public bool IsValid => !string.IsNullOrEmpty(path);
+
         /// <summary>
         /// Initializes a new instance of the <see cref="UnityFilePath"/> class.
         /// </summary>
@@ -62,12 +72,12 @@ namespace Glitch9.IO.Files
         /// <summary>
         /// Initializes a new instance of the <see cref="UnityFilePath"/> class with the specified Unity path type and file path.
         /// </summary>
-        /// <param name="unityPath">The Unity path type.</param>
+        /// <param name="pathType">The Unity path type.</param>
         /// <param name="path">The file path.</param>
         /// <param name="fileType">The content type of the file.</param>
-        public UnityFilePath(UnityPath unityPath, string path, ContentType fileType = ContentType.Json)
+        public UnityFilePath(PathType pathType, string path, ContentType fileType = ContentType.Json)
         {
-            this.unityPath = unityPath;
+            this.pathType = pathType;
             this.path = path;
             this.type = fileType;
             //type = fileType ?? ContentTypeUtils.ParseFileExtension(path);
@@ -75,8 +85,13 @@ namespace Glitch9.IO.Files
 
         public bool FileExists()
         {
-            string localPath = this.GetLocalPath();
+            string localPath = this.ResolveFilePath();
             return System.IO.File.Exists(localPath);
+        }
+
+        public override string ToString()
+        {
+            return $"{PathType}://{Path}";
         }
     }
 }

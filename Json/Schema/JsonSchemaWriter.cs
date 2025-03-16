@@ -13,14 +13,14 @@ namespace Glitch9.IO.Json.Schema
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         }
 
-        public void WriteSchema(JsonSchema schema)
+        public void WriteSchema(JsonSchema schema, StringCase typeStringCase)
         {
             if (schema == null) throw new ArgumentNullException(nameof(schema));
 
             _writer.WriteStartObject();
 
             WritePropertyIfNotNull("description", schema.Description);
-            WritePropertyIfNotNull("type", JsonSchemaTypes.GetValue(schema.Type));
+            WritePropertyIfNotNull("type", JsonSchemaTypes.GetValue(schema.Type, typeStringCase));
             WritePropertyIfNotNull("format", schema.Format);
 
             if (schema.Properties != null)
@@ -30,7 +30,7 @@ namespace Glitch9.IO.Json.Schema
                 foreach (KeyValuePair<string, JsonSchema> property in schema.Properties)
                 {
                     _writer.WritePropertyName(property.Key);
-                    WriteSchema(property.Value);
+                    WriteSchema(property.Value, typeStringCase);
                 }
                 _writer.WriteEndObject();
             }

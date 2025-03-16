@@ -1,4 +1,6 @@
+using System;
 using Cysharp.Threading.Tasks;
+using Glitch9.IO.Network;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
 // ReSharper disable InconsistentNaming
@@ -15,12 +17,13 @@ namespace Glitch9.IO.RESTApi
             internal const string METHOD_PATCH = "PATCH";
             internal const int NETWORK_CHECK_INTERVAL_IN_MILLIS = 500;  // 0.5 seconds
             internal const int NETWORK_CHECK_TIMEOUT_IN_MILLIS = 10000; // 10 seconds
-            internal const bool DEFAULT_LOG_REQUEST_HEADERS = false;
-            internal const bool DEFAULT_LOG_REQUEST_BODY = false;
-            internal const bool DEFAULT_LOG_REQUEST_INFO = false;
-            internal const bool DEFAULT_LOG_REQUEST_DETAILS = false;
-            internal const bool DEFAULT_LOG_RESPONSE_BODY = false;
-            internal const bool DEFAULT_LOG_STREAMED_DATA = false;
+            internal const bool DEFAULT_LOG_REQUEST_HEADERS = true;
+            internal const bool DEFAULT_LOG_REQUEST_BODY = true;
+            internal const bool DEFAULT_LOG_REQUEST_INFO = true;
+            internal const bool DEFAULT_LOG_REQUEST_DETAILS = true;
+            internal const bool DEFAULT_LOG_RESPONSE_BODY = true;
+            internal const bool DEFAULT_LOG_STREAMED_DATA = true;
+            internal static readonly TimeSpan DEFAULT_TIMEOUT = TimeSpan.FromSeconds(30);
         }
 
         /// <summary>
@@ -69,23 +72,41 @@ namespace Glitch9.IO.RESTApi
         public virtual bool LogStreamEvents { get; set; } = Config.DEFAULT_LOG_STREAMED_DATA;
 
         /// <summary>
+        /// Gets or sets the timeout for requests.
+        /// </summary>
+        public TimeSpan Timeout { get; set; } = Config.DEFAULT_TIMEOUT;
+
+        /// <summary>
         /// Gets or sets the SSE parser for handling Server-Sent Events.
         /// </summary>
-        public SSEParser SSEParser { get; set; } = new SSEParser();
+        public ISSEParser SSEParser { get; set; }
 
-        internal RESTLoggerInternal InternalLogger { get; set; }
+        /// <summary>
+        /// Name of the last request made.
+        /// </summary>
+        public string LastRequest { get; set; } = "";
+
+        /// <summary>
+        /// Gets or sets the last endpoint used.
+        /// </summary>
+        public string LastEndpoint { get; set; } = "";
+
+        // internal
+        internal InternalNetLogger InternalLogger { get; set; }
 
 
         /// <summary>
         /// Constructor to initialize RESTClient with optional JSON settings.
         /// </summary>
         /// <param name="jsonSettings">Custom JSON serializer settings.</param>
+        /// <param name="sseParser">Custom SSE parser.</param>
         /// <param name="logger">Custom logger.</param>
-        public RESTClient(JsonSerializerSettings jsonSettings = null, ILogger logger = null)
+        public RESTClient(JsonSerializerSettings jsonSettings = null, ISSEParser sseParser = null, ILogger logger = null)
         {
             JsonSettings = jsonSettings ?? JsonUtils.DefaultSettings;
-            Logger = logger ?? new RESTLogger();
-            InternalLogger = new RESTLoggerInternal(Logger);
+            SSEParser = sseParser;
+            Logger = logger ?? new NetLogger("RESTApi");
+            InternalLogger = new InternalNetLogger(Logger);
         }
 
         /// <summary>
@@ -97,7 +118,8 @@ namespace Glitch9.IO.RESTApi
         public virtual async UniTask<IResult> POST<TReq>(TReq request)
             where TReq : RESTRequest
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, UnityWebRequest.kHttpVerbPOST, this);
+            return await RESTApiV3.SendRequest<TReq, RESTResponse>(request, UnityWebRequest.kHttpVerbPOST, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -109,9 +131,10 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> POST<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbPOST, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbPOST, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -123,7 +146,8 @@ namespace Glitch9.IO.RESTApi
         public virtual async UniTask<IResult> PUT<TReq>(TReq request)
             where TReq : RESTRequest
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, UnityWebRequest.kHttpVerbPUT, this);
+            return await RESTApiV3.SendRequest<TReq, RESTResponse>(request, UnityWebRequest.kHttpVerbPUT, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -135,21 +159,23 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> PUT<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbPUT, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbPUT, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
         /// Sends a GET request with a generic request type and default response and error types.
         /// </summary>
-        /// <typeparam name="TReq">Request type.</typeparam>
+        /// <typeparam name="TRes">Response type.</typeparam>
         /// <param name="request">Request object.</param>
         /// <returns>Response result.</returns>
-        public virtual async UniTask<IResult> GET<TReq>(TReq request)
-            where TReq : RESTRequest
+        public virtual async UniTask<IResult> GET<TRes>(RESTRequest request)
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, UnityWebRequest.kHttpVerbGET, this);
+            return await RESTApiV3.SendRequest<RESTRequest, TRes>(request, UnityWebRequest.kHttpVerbGET, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -161,9 +187,10 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> GET<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbGET, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbGET, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -175,7 +202,8 @@ namespace Glitch9.IO.RESTApi
         public virtual async UniTask<IResult> DELETE<TReq>(TReq request)
             where TReq : RESTRequest
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, UnityWebRequest.kHttpVerbDELETE, this);
+            return await RESTApiV3.SendRequest<TReq, RESTResponse>(request, UnityWebRequest.kHttpVerbDELETE, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -187,9 +215,10 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> DELETE<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbDELETE, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbDELETE, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -201,7 +230,8 @@ namespace Glitch9.IO.RESTApi
         public virtual async UniTask<IResult> HEAD<TReq>(TReq request)
             where TReq : RESTRequest
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, UnityWebRequest.kHttpVerbHEAD, this);
+            return await RESTApiV3.SendRequest<TReq, RESTResponse>(request, UnityWebRequest.kHttpVerbHEAD, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -213,9 +243,10 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> HEAD<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbHEAD, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, UnityWebRequest.kHttpVerbHEAD, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -227,7 +258,8 @@ namespace Glitch9.IO.RESTApi
         public virtual async UniTask<IResult> PATCH<TReq>(TReq request)
             where TReq : RESTRequest
         {
-            return await RESTApiV3.SendRequest<TReq, RESTObject>(request, Config.METHOD_PATCH, this);
+            return await RESTApiV3.SendRequest<TReq, RESTResponse>(request, Config.METHOD_PATCH, this)
+                .AttachExternalCancellation(request.CancellationToken);
         }
 
         /// <summary>
@@ -239,9 +271,43 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         public virtual async UniTask<IResult> PATCH<TReq, TRes>(TReq request)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
-            return await RESTApiV3.SendRequest<TReq, TRes>(request, Config.METHOD_PATCH, this);
+            return await RESTApiV3.SendRequest<TReq, TRes>(request, Config.METHOD_PATCH, this)
+                .AttachExternalCancellation(request.CancellationToken);
+        }
+
+
+        /// <summary>
+        /// Smart method to execute a CRUD operation.
+        /// </summary>
+        /// <typeparam name="TReq"></typeparam>
+        /// <typeparam name="TRes"></typeparam>
+        /// <param name="method"></param>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public virtual async UniTask<IResult> ExecuteAsync<TReq, TRes>(CRUDMethod method, TReq request)
+            where TReq : RESTRequest
+            where TRes : RESTResponse, new()
+        {
+            switch (method)
+            {
+                case CRUDMethod.Create:
+                case CRUDMethod.Query:
+                case CRUDMethod.Update:
+                    return await POST<TReq, TRes>(request);
+                case CRUDMethod.Get:
+                case CRUDMethod.Retrieve:
+                case CRUDMethod.List:
+                    return await GET<TReq, TRes>(request);
+                case CRUDMethod.Delete:
+                    return await DELETE<TReq, TRes>(request);
+                case CRUDMethod.Patch:
+                    return await PATCH<TReq, TRes>(request);
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(method), method, null);
+            }
         }
     }
 }

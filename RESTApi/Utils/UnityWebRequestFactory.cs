@@ -1,4 +1,5 @@
 using Glitch9.IO.Files;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -12,9 +13,9 @@ namespace Glitch9.IO.RESTApi
             where TReq : RESTRequest
         {
             if (req == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
-            if (req.WebRequest != null) return req.WebRequest;
+            //if (req.WebRequest != null) return req.WebRequest;
 
-            EncodeBody(req, method, client);
+            CreateUnityWebRequest(req, method, client);
             bool includeContentTypeHeader = req.ContentType == ContentType.Json;
 
             if (client.LogRequestHeaders)
@@ -23,7 +24,15 @@ namespace Glitch9.IO.RESTApi
                 {
                     foreach (RESTHeader header in req.GetHeaders(includeContentTypeHeader))
                     {
-                        sb.AppendLine($"{header.Name}: {header.Value}");
+                        if (header.Name.Contains("Auth"))
+                        {
+                            sb.AppendLine($"{header.Name}: [ApiKey]");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{header.Name}: {header.Value}");
+                        }
+                 
                         req.WebRequest.SetRequestHeader(header);
                     }
 
@@ -41,7 +50,7 @@ namespace Glitch9.IO.RESTApi
             return req.WebRequest;
         }
 
-        private static void EncodeBody<TReq>(TReq req, string method, RESTClient client)
+        private static void CreateUnityWebRequest<TReq>(TReq req, string method, RESTClient client)
             where TReq : RESTRequest
         {
             string url = req.Endpoint;
@@ -79,12 +88,14 @@ namespace Glitch9.IO.RESTApi
                 if (form == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode form data of this request.");
                 //else if (logBody) RESTLog.RequestBody($"WWWForm: \r\n {form}");
                 req.WebRequest = UnityWebRequest.Post(url, form);
+                req.TimeoutInSec = Convert.ToInt32(client.Timeout.TotalSeconds);
             }
             else if (contentType == ContentType.MultipartForm)
             {
                 List<IMultipartFormSection> formData = req.ToMultipartFormSections(client);
                 if (formData == null) throw new IssueException(Issue.InvalidRequest, "Failed to encode form data of this request.");
                 req.WebRequest = UnityWebRequest.Post(url, formData);
+                req.TimeoutInSec = Convert.ToInt32(client.Timeout.TotalSeconds);
             }
             else
             {

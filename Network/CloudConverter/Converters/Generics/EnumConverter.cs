@@ -16,7 +16,7 @@ namespace Glitch9.IO.Network
             }
             else
             {
-                GNLog.ParseFail(typeof(TEnum));
+                GNLog.Error($"Failed to parse enum: {stringValue}");
                 return default;
             }
         }

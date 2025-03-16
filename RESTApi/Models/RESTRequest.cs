@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -18,13 +19,13 @@ namespace Glitch9.IO.RESTApi
         /// </summary>
         /// <param name="endpoint"></param>
         /// <returns></returns>
-        public static RESTRequest Empty(string endpoint)
+        public static RESTRequest Empty(string endpoint = null)
         {
             RESTRequest req = new() { Endpoint = endpoint };
             return req;
         }
 
-        private const string DEFAULT_AUTH_HEADER_FIELD_NAME = "Authorization";
+   
         private const int DEFAULT_RETRY_COUNT = 3;
         private const int DEFAULT_RETRY_DELAY_IN_SEC = 1;
         private const int DEFAULT_TIMEOUT_IN_SEC = 90;
@@ -100,26 +101,29 @@ namespace Glitch9.IO.RESTApi
         [JsonIgnore] public UnityFilePath DownloadPath { get; set; }
 
         /// <summary>
-        /// This is only used locally.
+        /// The local sender of the request.
         /// </summary>
-        [JsonIgnore] public Guid Guid { get; } = Guid.NewGuid();
+        [JsonIgnore] public string Sender { get; set; }
+        
+        [JsonIgnore] public virtual bool IsBetaRequest { get; set; } = false;
+
+
+        [JsonIgnore] private readonly Guid _guid = Guid.NewGuid();
+
+        [JsonIgnore] public CancellationToken CancellationToken => _cancellationTokenSource.Token;
+        [JsonIgnore] private readonly CancellationTokenSource _cancellationTokenSource = new();
 
 
         protected RESTRequest() { }
 
-        public void SetSecret(string secret)
+        public void SetAuthHeader(string secret, string headerName = RESTHeader.DEFAULT_AUTH_HEADER_FIELD_NAME)
         {
-            AddHeader(DEFAULT_AUTH_HEADER_FIELD_NAME, $"Bearer {secret}");
-        }
-
-        public void AddAuthHeader(string headerValue, string headerName = DEFAULT_AUTH_HEADER_FIELD_NAME)
-        {
-            Headers.Add(new RESTHeader(headerName, headerValue));
+            AddHeader(headerName, $"Bearer {secret}");
         }
 
         public void AddHeader(string key, string value)
         {
-            Headers.Add(new RESTHeader(key, value));
+            AddHeader(new RESTHeader(key, value));
         }
 
         public void AddHeader(RESTHeader header)
@@ -133,8 +137,12 @@ namespace Glitch9.IO.RESTApi
             foreach (RESTHeader header in Headers) yield return header;
         }
 
+        public void Cancel()
+        {
+            _cancellationTokenSource.Cancel();
+        }
 
-        // equal check using Guid
+        #region Equality Members
         public static bool operator ==(RESTRequest left, RESTRequest right)
         {
             if (ReferenceEquals(left, null) && ReferenceEquals(right, null))
@@ -145,7 +153,7 @@ namespace Glitch9.IO.RESTApi
             {
                 return false;
             }
-            return left.Guid == right.Guid;
+            return left._guid == right._guid;
         }
 
         public static bool operator !=(RESTRequest left, RESTRequest right)
@@ -155,7 +163,7 @@ namespace Glitch9.IO.RESTApi
 
         protected bool Equals(RESTRequest other)
         {
-            return Equals(Guid, other.Guid);
+            return Equals(_guid, other._guid);
         }
 
         public override bool Equals(object obj)
@@ -168,8 +176,9 @@ namespace Glitch9.IO.RESTApi
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Guid);
+            return HashCode.Combine(_guid);
         }
+        #endregion
 
 
         public abstract class BaseApiReqBuilder<TBuilder, TReq>
@@ -240,7 +249,7 @@ namespace Glitch9.IO.RESTApi
             /// <remarks>
             /// (Optional) Very rarely, in some APIs, especially in old APIs, the HTTP header field name of Authorization may be different. (e.g. case-insensitive)
             /// </remarks>
-            public TBuilder AddAuthHeader(string headerValue, string headerName = DEFAULT_AUTH_HEADER_FIELD_NAME)
+            public TBuilder AddAuthHeader(string headerValue, string headerName = RESTHeader.DEFAULT_AUTH_HEADER_FIELD_NAME)
             {
                 return AddHeader(new RESTHeader(headerName, headerValue));
             }
@@ -322,9 +331,9 @@ namespace Glitch9.IO.RESTApi
                 return (TBuilder)this;
             }
 
-            public TBuilder SetDownloadPath(UnityPath unityPath, string subPath, ContentType contentType = ContentType.Json)
+            public TBuilder SetDownloadPath(PathType pathType, string subPath, ContentType contentType = ContentType.Json)
             {
-                _req.DownloadPath = new(unityPath, subPath, contentType);
+                _req.DownloadPath = new(pathType, subPath, contentType);
                 return (TBuilder)this;
             }
 
@@ -358,13 +367,14 @@ namespace Glitch9.IO.RESTApi
 
             public virtual TReq Build(ContentType contentType)
             {
-                if (AllRequiredPropertiesSet())
-                {
-                    _req.ContentType = contentType;
-                    return _req;
-                }
-                Debug.LogError($"{typeof(TReq).Name}: Missing required properties");
-                return null;
+                return Build(null, contentType);
+            }
+
+            public virtual TReq Build(object sender, ContentType contentType)
+            {
+                if (sender != null) _req.Sender = sender.ToSenderName();
+                _req.ContentType = contentType;
+                return _req;
             }
         }
     }

@@ -15,8 +15,8 @@ namespace Glitch9.IO.Json.Schema
 
             public TypeSchema(Type type, JsonSchema schema)
             {
-                Validate.Argument.NotNull(type, nameof(type));
-                Validate.Argument.NotNull(schema, nameof(schema));
+                ThrowIf.ArgumentIsNull(type, nameof(type));
+                ThrowIf.ArgumentIsNull(schema, nameof(schema));
 
                 Type = type;
                 Schema = schema;
@@ -44,6 +44,12 @@ namespace Glitch9.IO.Json.Schema
         {
             return GenerateInternal(type);
         }
+
+        public JsonSchema Generate(Dictionary<string, object> dictionary)
+        {
+            return GenerateInternal(dictionary);
+        }
+
 
         private JsonSchema GenerateInternal(Type type)
         {
@@ -110,6 +116,29 @@ namespace Glitch9.IO.Json.Schema
             if (schemaAttribute != null)
             {
                 CurrentSchema.Description = schemaAttribute.Description;
+            }
+
+            CurrentSchema.Required = requiredProperties;
+            return Pop().Schema;
+        }
+
+        private JsonSchema GenerateInternal(Dictionary<string, object> dictionary)
+        {
+            if (_stack.Any(tc => tc.Type == dictionary.GetType()))
+            {
+                throw new JsonException($"Unresolved circular reference for type '{dictionary.GetType()}'.");
+            }
+
+            Push(new TypeSchema(dictionary.GetType(), new JsonSchema()));
+            List<string> requiredProperties = new();
+
+            CurrentSchema.Type = JsonSchemaType.Object;
+            CurrentSchema.Properties = new Dictionary<string, JsonSchema>();
+
+            foreach (KeyValuePair<string, object> kvp in dictionary)
+            {
+                JsonSchema propertySchema = GenerateInternal(kvp.Value.GetType());
+                CurrentSchema.Properties.Add(kvp.Key, propertySchema);
             }
 
             CurrentSchema.Required = requiredProperties;

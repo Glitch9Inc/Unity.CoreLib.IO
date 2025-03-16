@@ -26,7 +26,7 @@ namespace Glitch9.IO.Network
                 }
                 else
                 {
-                    GNLog.ParseFail(keyType);
+                    GNLog.Error($"{key}은 {keyType.Name}으로 변환할 수 없습니다.");
                     return null;
                 }
             }

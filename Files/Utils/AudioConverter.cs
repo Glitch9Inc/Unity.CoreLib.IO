@@ -83,14 +83,12 @@ namespace Glitch9.IO.Files
         {
             if (clip == null)
             {
-                Debug.LogError("AudioClip is null.");
-                return;
+                throw new Exception("AudioClip is null.");
             }
 
             if (string.IsNullOrEmpty(localFilePath))
             {
-                Debug.LogError("Local file path is null or empty.");
-                return;
+                throw new Exception("Local file path is null or empty.");
             }
 
             byte[] bytes;
@@ -109,16 +107,78 @@ namespace Glitch9.IO.Files
             await File.WriteAllBytesAsync(localFilePath, bytes);
         }
 
+        public static async UniTask WriteAudioFile(float[] floatArray, string localFilePath)
+        {
+            if (floatArray == null)
+            {
+                throw new Exception("Failed to write audio file. Audio bytes are null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(localFilePath))
+            {
+                throw new Exception("Failed to write audio file. Local file path is null or empty.");
+            }
+
+            // check if filepath has a valid extension (e.g. .wav, .mp3...)
+            string extension = Path.GetExtension(localFilePath);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                throw new Exception("Failed to write audio file. Local file path does not have a valid extension.");
+            }
+
+            string directory = Path.GetDirectoryName(localFilePath);
+
+            if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            MemoryStream stream = new();
+            BinaryWriter writer = new(stream);
+
+            int length = floatArray.Length;
+            writer.Write(length);
+
+            foreach (float sample in floatArray)
+            {
+                writer.Write(sample);
+            }
+
+            byte[] bytes = stream.ToArray();
+
+            await File.WriteAllBytesAsync(localFilePath, bytes);
+            Debug.Log($"Audio file downloaded to {localFilePath}");
+        }
+
 
         public static async UniTask WriteAudioFile(byte[] audioBytes, string localFilePath)
         {
-            if (audioBytes == null || string.IsNullOrWhiteSpace(localFilePath)) return;
+            if (audioBytes == null)
+            {
+                throw new Exception("Failed to write audio file. Audio bytes are null.");
+            }
+
+            if (string.IsNullOrWhiteSpace(localFilePath))
+            {
+                throw new Exception("Failed to write audio file. Local file path is null or empty.");
+            }
+
             // check if filepath has a valid extension (e.g. .wav, .mp3...)
             string extension = Path.GetExtension(localFilePath);
-            if (string.IsNullOrWhiteSpace(extension)) return;
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                throw new Exception("Failed to write audio file. Local file path does not have a valid extension.");
+            }
+
             string directory = Path.GetDirectoryName(localFilePath);
-            if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+
+            if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
             await File.WriteAllBytesAsync(localFilePath, audioBytes);
+            Debug.Log($"Audio file downloaded to {localFilePath}");
         }
 
         private static async UniTask<AudioClip> HandleMPEGDecodingAsync(byte[] audioBytes, string filePath)
@@ -127,13 +187,18 @@ namespace Glitch9.IO.Files
             // Generate a temporary path for the audio file.
             // Ensure the file name includes the correct directory separator and a unique identifier to avoid conflicts.
             bool tempPath = false;
+            const string EXT = ".mp3";
 
             try
             {
                 if (string.IsNullOrWhiteSpace(filePath))
                 {
-                    filePath = Path.Combine(Application.persistentDataPath, Path.GetRandomFileName() + ".mp3");
+                    filePath = Path.Combine(Application.persistentDataPath, Path.GetRandomFileName() + EXT);
                     tempPath = true;
+                }
+                else if (!filePath.EndsWith(EXT))
+                {
+                    filePath += EXT;
                 }
 
                 // Write the audio bytes to a temporary file asynchronously.
@@ -144,14 +209,14 @@ namespace Glitch9.IO.Files
 
                 if (request.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.ProtocolError)
                 {
-                    Debug.LogError($"Error while loading audio clip: {request.error}");
-                    return null;
+                    throw new Exception($"Error while loading audio clip: {request.error}");
                 }
                 else
                 {
                     // Successfully loaded the audio clip.
                     AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
-                    if (clip == null) Debug.LogError("Failed to load audio clip.");
+                    if (clip == null) throw new Exception("Failed to load audio clip.");
+
                     return clip;
                 }
             }
@@ -168,14 +233,14 @@ namespace Glitch9.IO.Files
         public static async UniTask<AudioClip> LoadAudioClip(UnityFilePath filePath)
         {
             if (filePath == null) return null;
-            return await LoadAudioClip(filePath.Path, filePath.UnityPath);
+            return await LoadAudioClip(filePath.Path, filePath.PathType);
         }
 
-        public static async UniTask<AudioClip> LoadAudioClip(string filePath, UnityPath path = UnityPath.Assets)
+        public static async UniTask<AudioClip> LoadAudioClip(string filePath, PathType pathType = PathType.DataPath)
         {
             if (string.IsNullOrEmpty(filePath)) return null;
 
-            if (path == UnityPath.Resources)
+            if (pathType == PathType.Resources)
             {
                 ResourceRequest request = Resources.LoadAsync<AudioClip>(filePath);
                 await request.ToUniTask();
@@ -183,17 +248,17 @@ namespace Glitch9.IO.Files
                 return null; // 혹은 오류 처리
             }
 
-            if (path == UnityPath.URL)
+            if (pathType == PathType.WebUrl)
             {
                 return await LoadAudioClipFromFilePath(filePath);
             }
 
-            filePath = FilePathResolver.ResolveUnityWebRequestLocalPath(path, filePath);
-            if (!await FilePathResolver.DelayedExists(filePath)) return null;
-            
+            filePath = PathResolver.ResolveUnityWebRequestPath(pathType, filePath);
+            if (!await PathResolver.DelayedExists(filePath)) return null;
+
             if (!filePath.StartsWith("file://")) filePath = "file://" + filePath;
             filePath = filePath.Replace("\\", "/");
-   
+
             return await LoadAudioClipFromFilePath(filePath);
         }
 
@@ -204,7 +269,7 @@ namespace Glitch9.IO.Files
 
             // UnityWebRequest를 사용하여 텍스처를 비동기적으로 로드합니다.
             using UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(filePath, audioType);
-            
+
             // SendWebRequest 대신 await를 사용합니다.
             await www.SendWebRequest().WithCancellation(CancellationToken.None);
 

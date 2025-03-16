@@ -1,9 +1,8 @@
 using Cysharp.Threading.Tasks;
 using Glitch9.IO.Files;
-using System;
 using Glitch9.IO.Network;
+using System;
 using UnityEngine.Networking;
-using static Glitch9.IO.RESTApi.RESTClient;
 
 namespace Glitch9.IO.RESTApi
 {
@@ -30,16 +29,39 @@ namespace Glitch9.IO.RESTApi
         /// 버전 4.1 업데이트: 2024-06-05 @Munchkin
         /// - Logger 추가 (RESTLogger.cs)
         /// 
+        /// 버전 4.3 업데이트: 2024-06-20 @Munchkin
+        /// - TimeSpan Timeout 추가
+        /// 
 
         #endregion
 
-        public const int MIN_INTERNAL_OPERATION_MILLIS = 1000;
+
+        public static class Config
+        {
+            public const int NETWORK_CHECK_INTERVAL_IN_MILLIS = 1000;
+            public const int NETWORK_CHECK_TIMEOUT_IN_MILLIS = 5000;
+            public const int MIN_INTERNAL_OPERATION_MILLIS = 100;
+        }
 
         /// <summary>
         /// Gets the version of the RESTApi library.
         /// </summary>
-        public static Version Version => _version ??= new Version("4.1.0");
+        public static Version Version => _version ??= new Version("4.3.0");
         private static Version _version;
+
+        private static string HideKeyFromEndpoint(string endpoint)
+        {
+            if (endpoint.Contains("key="))
+            {
+                // replace the key with [api_key]
+                int keyStart = endpoint.IndexOf("key=", StringComparison.Ordinal);
+                // find & or end of string
+                int keyEnd = endpoint.IndexOf('&', StringComparison.Ordinal);
+                if (keyEnd == -1) keyEnd = endpoint.Length;
+                endpoint = endpoint.Remove(keyStart + 4, keyEnd - keyStart - 4).Insert(keyStart + 4, "[api_key]");
+            }
+            return endpoint;
+        }
 
         /// <summary>
         /// Sends a request and processes the response.
@@ -52,20 +74,31 @@ namespace Glitch9.IO.RESTApi
         /// <returns>Response result.</returns>
         internal static async UniTask<IResult> SendRequest<TReq, TRes>(TReq request, string method, RESTClient client)
             where TReq : RESTRequest
-            where TRes : RESTObject, new()
+            where TRes : RESTResponse, new()
         {
             // Step 1. Validating request ==========================================================================================================================
             if (request == null) throw new IssueException(Issue.InvalidRequest, "Request is null.");
             if (string.IsNullOrEmpty(request.Endpoint)) throw new IssueException(Issue.InvalidEndpoint, "Endpoint is null or empty.");
 
-            if (client.LogRequestInfo) client.InternalLogger.RequestInfo($"Sending {method} request to {request.Endpoint}.");
+            client.LastRequest = request.GetType().Name;
+            client.LastEndpoint = request.Endpoint;
+            string endpointLog = "";
+
+            if (client.LogRequestInfo)
+            {
+                endpointLog = HideKeyFromEndpoint(request.Endpoint);
+                client.InternalLogger.RequestInfo($"Sending {method} request to {endpointLog}.");
+            }
             await NetworkUtils.CheckNetworkAsync(Config.NETWORK_CHECK_INTERVAL_IN_MILLIS, Config.NETWORK_CHECK_TIMEOUT_IN_MILLIS);
             using UnityWebRequest webReq = UnityWebRequestFactory.Create(request, method, client);
+            //UnityEngine.Debug.LogError("UnityWebRequestFactory.Create(request, method, client);");
 
             if (webReq == null) throw new IssueException(Issue.InvalidRequest, "UnityWebRequest is null.");
 
             // Step 2. Sending request =============================================================================================================================
             await HandleUnityWebRequestResultAsync(webReq, request.RetryDelayInSec, request.MaxRetry, client);
+
+            //UnityEngine.Debug.LogError("HandleUnityWebRequestResultAsync(webReq, request.RetryDelayInSec, request.MaxRetry, client);");
 
             // Step 3. Detect content type from the response ========================================================================================================
             string contentTypeAsString = webReq.GetResponseHeader("Content-Type");
@@ -77,17 +110,18 @@ namespace Glitch9.IO.RESTApi
             {
                 // If it's a stream, everything is handled within the SendAndProcessRequest method
                 if (client.LogStreamEvents) client.InternalLogger.RequestInfo("Stream has ended.");
-                return RESTObject.Done(); // Let the caller know that the stream has ended
+                return RESTResponse.Done(); // Let the caller know that the stream has ended
             }
-
+            //UnityEngine.Debug.LogError("isStream: " + isStream);
             if (webReq.downloadHandler == null) throw new IssueException(Issue.EmptyResponse, "DownloadHandler is null.");
             if (string.IsNullOrEmpty(webReq.downloadHandler.text)) throw new IssueException(Issue.EmptyResponse, "DownloadHandler text is null or empty.");
 
             // Step 5. Handling response ============================================================================================================================
-            if (client.LogRequestInfo) client.InternalLogger.RequestInfo($"Received response from {request.Endpoint}");
-
+            if (client.LogRequestInfo) client.InternalLogger.RequestInfo($"Received response from {endpointLog}");
+            //UnityEngine.Debug.LogError("Received response from {endpointLog}");
             DataTransferMode returnTransferMode = DataTransferMode.Text;
             if (request.DownloadPath != null) returnTransferMode = request.DownloadPath.Type.ToDataTransferMode();
+            //Debug.LogError($"returnTransferMode: {returnTransferMode} / {request.DownloadPath.Type}");
 
             if (returnTransferMode == DataTransferMode.Text)
             {
@@ -115,13 +149,13 @@ namespace Glitch9.IO.RESTApi
 
         public static async UniTask HandleUnityWebRequestResultAsync(UnityWebRequest request, float baseDelayInSec, int maxRetries, RESTClient client)
         {
-            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (request == null) throw new ArgumentNullException("UnityWebRequest is null.");
 
-            float currentDelay = baseDelayInSec;
-            if (baseDelayInSec < 2) currentDelay = 2; // Minimum delay of 2 seconds
+            float currentDelay = baseDelayInSec < 2 ? 2 : baseDelayInSec; // Minimum delay of 2 seconds
 
             for (int attempt = 0; attempt < maxRetries; ++attempt)
             {
+                //if (request == null) continue;
                 if (request.isDone) break;
 
                 await request.SendWebRequest().ToUniTask();
@@ -131,18 +165,26 @@ namespace Glitch9.IO.RESTApi
                     return;
                 }
 
+                //UnityEngine.Debug.LogError("request.result: " + request.result);
                 LogRequestError(request, client);
-                if (attempt == maxRetries - 1) break;
 
-                await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));
-                currentDelay *= 2; // Exponential backoff
+                if (attempt < maxRetries - 1)
+                {
+                    //UnityEngine.Debug.LogError("await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));");
+                    await UniTask.Delay(TimeSpan.FromSeconds(currentDelay));
+                    currentDelay *= 2; // Exponential backoff
+                }
             }
 
             throw new TimeoutException("UnityWebRequest did not complete successfully within the specified number of retries.");
         }
 
+
         private static void LogRequestError(UnityWebRequest request, RESTClient client)
         {
+            string errorMsg = $"Request to {request.url} failed. Error: {request.error}, Response Code: {request.responseCode}";
+            client.Logger.Error(errorMsg);
+
             switch (request.result)
             {
                 case UnityWebRequest.Result.ConnectionError:

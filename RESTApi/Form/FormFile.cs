@@ -43,7 +43,8 @@ namespace Glitch9.IO.RESTApi
         {
             if (audioClip == null) throw new ArgumentException("AudioClip cannot be null", nameof(audioClip));
             if (string.IsNullOrEmpty(fileName)) throw new ArgumentException("FileName cannot be null or empty", nameof(fileName));
-            Data = audioClip.ToBytes();
+            //Data = audioClip.ToBytes();
+            Data = WavUtils.FromAudioClip(audioClip);
             FileName = fileName;
             ContentType = contentType;
         }

@@ -11,7 +11,7 @@ namespace Glitch9.IO.Network
                 return TimeSpan.FromMilliseconds(doubleValue);
             }
 
-            GNLog.ParseFail(typeof(TimeSpan));
+            GNLog.Error($"Failed to parse TimeSpan: {propertyValue}");
             return TimeSpan.Zero;
         }
 

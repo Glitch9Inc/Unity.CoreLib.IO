@@ -179,6 +179,8 @@ namespace Glitch9.IO.Network
         {
             if (!TryCreateUri(uri, out Uri result)) return null;
 
+            if (dlLocalPath.EndsWith(".json")) dlLocalPath = dlLocalPath.Replace(".json", ".png");
+
             if (await DownloadWithRetryAsync(result, dlLocalPath))
             {
                 return await LoadTextureAsync(dlLocalPath);

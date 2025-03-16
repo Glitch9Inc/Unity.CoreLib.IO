@@ -4,6 +4,9 @@ using System;
 
 namespace Glitch9.IO.RESTApi
 {
+    /// <summary>
+    /// Custom <see cref="JsonConverter"/> for API enum values.
+    /// </summary>
     public class ApiEnumConverter : StringEnumConverter
     {
         public static TEnum Parse<TEnum>(string value) where TEnum : Enum

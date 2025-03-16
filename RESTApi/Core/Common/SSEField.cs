@@ -1,5 +1,8 @@
 namespace Glitch9.IO.RESTApi
 {
+    /// <summary>
+    /// Server-Sent Event field keys.
+    /// </summary>
     public enum SSEField
     {
         Unset = 0,

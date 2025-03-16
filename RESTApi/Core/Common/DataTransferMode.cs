@@ -1,5 +1,8 @@
 namespace Glitch9.IO.RESTApi
 {
+    /// <summary>
+    /// Data transfer mode for <see cref="RESTApiV3"/>.
+    /// </summary>
     public enum DataTransferMode
     {
         /// <summary>

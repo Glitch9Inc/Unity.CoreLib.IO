@@ -13,8 +13,7 @@ namespace Glitch9.IO.Json.Schema
         Null,
         Enum
     }
-
-
+    
     public class JsonSchemaTypes
     {
         public const string None = "none";
@@ -26,18 +25,18 @@ namespace Glitch9.IO.Json.Schema
         public const string Boolean = "boolean";
         public const string Null = "null";
 
-        public static string GetValue(JsonSchemaType type)
+        public static string GetValue(JsonSchemaType type, StringCase stringCase)
         {
             return type switch
             {
-                JsonSchemaType.String => String,
-                JsonSchemaType.Integer => Integer,
-                JsonSchemaType.Float => Float,
-                JsonSchemaType.Bool => Boolean,
-                JsonSchemaType.Object => Object,
-                JsonSchemaType.Array => Array,
-                JsonSchemaType.Null => Null,
-                JsonSchemaType.Enum => String,
+                JsonSchemaType.String => String.ConvertToCase(stringCase),
+                JsonSchemaType.Integer => Integer.ConvertToCase(stringCase),
+                JsonSchemaType.Float => Float.ConvertToCase(stringCase),
+                JsonSchemaType.Bool => Boolean.ConvertToCase(stringCase),
+                JsonSchemaType.Object => Object.ConvertToCase(stringCase),
+                JsonSchemaType.Array => Array.ConvertToCase(stringCase),
+                JsonSchemaType.Null => Null.ConvertToCase(stringCase),
+                JsonSchemaType.Enum => String.ConvertToCase(stringCase),
                 _ => None
             };
         }
